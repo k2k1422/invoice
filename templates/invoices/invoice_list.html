@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}My Invoices - Invoice App{% endblock %}
+
+{% block content %}
+<h2>My Invoices</h2>
+
+<div style="margin: 20px 0;">
+    <a href="{% url 'invoices:create_invoice' %}" class="btn">Create New Invoice</a>
+</div>
+
+{% if invoices %}
+    <table>
+        <thead>
+            <tr>
+                <th>Invoice #</th>
+                <th>Client</th>
+                <th>Date</th>
+                <th>Due Date</th>
+                <th>Total</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for invoice in invoices %}
+                <tr>
+                    <td>{{ invoice.invoice_number }}</td>
+                    <td>{{ invoice.client_name }}</td>
+                    <td>{{ invoice.invoice_date }}</td>
+                    <td>{{ invoice.due_date }}</td>
+                    <td>${{ invoice.total|floatformat:2 }}</td>
+                    <td>
+                        <a href="{% url 'invoices:invoice_detail' invoice.id %}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">View</a>
+                        <a href="{% url 'invoices:invoice_print' invoice.id %}" class="btn" style="font-size: 12px; padding: 5px 10px;">Print</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div style="text-align: center; margin: 50px 0;">
+        <p>You haven't created any invoices yet.</p>
+        <a href="{% url 'invoices:create_invoice' %}" class="btn">Create Your First Invoice</a>
+    </div>
+{% endif %}
+{% endblock %}

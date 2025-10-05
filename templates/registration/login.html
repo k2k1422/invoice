@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - Invoice App{% endblock %}
+
+{% block content %}
+<h2>Login</h2>
+
+<form method="post">
+    {% csrf_token %}
+    <div>
+        <label for="{{ form.username.id_for_label }}">Username:</label>
+        {{ form.username }}
+    </div>
+    <div>
+        <label for="{{ form.password.id_for_label }}">Password:</label>
+        {{ form.password }}
+    </div>
+    
+    {% if form.errors %}
+        <div class="alert alert-error">
+            {{ form.errors }}
+        </div>
+    {% endif %}
+    
+    <button type="submit" class="btn">Login</button>
+</form>
+
+<p style="margin-top: 20px;">
+    Don't have an account? Contact the administrator to create one.
+</p>
+{% endblock %}

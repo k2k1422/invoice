@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - Invoice App{% endblock %}
+
+{% block content %}
+<h2>Welcome to Invoice Management System</h2>
+
+{% if user.is_authenticated %}
+    <p>Hello, {{ user.username }}! Welcome back.</p>
+    
+    <div style="margin: 30px 0;">
+        <h3>Quick Actions</h3>
+        <a href="{% url 'invoices:create_invoice' %}" class="btn">Create New Invoice</a>
+        <a href="{% url 'invoices:invoice_list' %}" class="btn btn-secondary">View All Invoices</a>
+    </div>
+    
+    <div>
+        <h3>About This System</h3>
+        <p>This simple invoice management system allows you to:</p>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+            <li>Create professional black and white invoices</li>
+            <li>Manage client information</li>
+            <li>Track invoice details and amounts</li>
+            <li>Print or export invoices</li>
+        </ul>
+    </div>
+{% else %}
+    <p>Please <a href="{% url 'login' %}">login</a> to access the invoice management system.</p>
+    
+    <div style="margin: 30px 0;">
+        <h3>Features</h3>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+            <li>Simple black and white invoice design</li>
+            <li>User authentication and authorization</li>
+            <li>Client management</li>
+            <li>Print-friendly invoice layout</li>
+            <li>Secure and lightweight</li>
+        </ul>
+    </div>
+{% endif %}
+{% endblock %}
