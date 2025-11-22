@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Stock Movement - Invoice App{% endblock %}
+
+{% block content %}
+<h2>Add Stock Movement</h2>
+
+<div style="max-width: 600px; margin: 20px 0;">
+    <form method="post">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div style="padding: 10px; margin: 10px 0; border: 1px solid #d00; background-color: #fee;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+        
+        <div style="margin-bottom: 20px;">
+            <label for="{{ form.product.id_for_label }}" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Product: <span style="color: #d00;">*</span>
+            </label>
+            {{ form.product }}
+            {% if form.product.errors %}
+                <div style="color: #d00; font-size: 14px; margin-top: 5px;">
+                    {{ form.product.errors }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="{{ form.movement_type.id_for_label }}" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Movement Type: <span style="color: #d00;">*</span>
+            </label>
+            {{ form.movement_type }}
+            {% if form.movement_type.errors %}
+                <div style="color: #d00; font-size: 14px; margin-top: 5px;">
+                    {{ form.movement_type.errors }}
+                </div>
+            {% endif %}
+            <small style="display: block; margin-top: 5px; color: #666;">
+                Select "Incoming Stock" to add inventory or "Outgoing Stock" to remove inventory.
+            </small>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="{{ form.quantity.id_for_label }}" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Quantity: <span style="color: #d00;">*</span>
+            </label>
+            {{ form.quantity }}
+            {% if form.quantity.errors %}
+                <div style="color: #d00; font-size: 14px; margin-top: 5px;">
+                    {{ form.quantity.errors }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="{{ form.movement_date.id_for_label }}" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Date: <span style="color: #d00;">*</span>
+            </label>
+            {{ form.movement_date }}
+            {% if form.movement_date.errors %}
+                <div style="color: #d00; font-size: 14px; margin-top: 5px;">
+                    {{ form.movement_date.errors }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="{{ form.notes.id_for_label }}" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Notes:
+            </label>
+            {{ form.notes }}
+            {% if form.notes.errors %}
+                <div style="color: #d00; font-size: 14px; margin-top: 5px;">
+                    {{ form.notes.errors }}
+                </div>
+            {% endif %}
+            <small style="display: block; margin-top: 5px; color: #666;">
+                Optional: Add any notes about this stock movement (e.g., supplier, reason, reference number).
+            </small>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <button type="submit" class="btn">Record Movement</button>
+            <a href="{% url 'invoices:inventory_management' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

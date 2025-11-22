@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventory Management - Invoice App{% endblock %}
+
+{% block content %}
+<h2>Inventory Management</h2>
+
+<div style="margin: 20px 0;">
+    {% if user.is_staff %}
+        <a href="{% url 'invoices:add_stock_movement' %}" class="btn">Add Stock Movement</a>
+        <a href="{% url 'invoices:product_list' %}" class="btn btn-secondary">Manage Products</a>
+    {% else %}
+        <a href="{% url 'invoices:product_list' %}" class="btn btn-secondary">View Products</a>
+    {% endif %}
+    <a href="{% url 'invoices:home' %}" class="btn btn-secondary">Back to Home</a>
+</div>
+
+<!-- Current Stock Levels -->
+<div style="margin: 30px 0;">
+    <h3>Current Stock Levels</h3>
+    {% if products %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Unit</th>
+                    <th>Current Stock</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                    <tr>
+                        <td><strong>{{ product.item_name }}</strong></td>
+                        <td>{{ product.unit_of_measure }}</td>
+                        <td>
+                            {% if product.quantity_in_stock < 10 %}
+                                <span style="color: #d00; font-weight: bold;">{{ product.quantity_in_stock }}</span>
+                            {% elif product.quantity_in_stock < 50 %}
+                                <span style="color: #f90; font-weight: bold;">{{ product.quantity_in_stock }}</span>
+                            {% else %}
+                                <span style="color: #080;">{{ product.quantity_in_stock }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if product.is_active %}
+                                <span style="color: #080;">✓ Active</span>
+                            {% else %}
+                                <span style="color: #999;">✗ Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'invoices:product_stock_history' product.id %}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">View History</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No products found. <a href="{% url 'invoices:create_product' %}">Create a product</a> first.</p>
+    {% endif %}
+</div>
+
+<!-- Recent Stock Movements -->
+<div style="margin: 30px 0;">
+    <h3>Recent Stock Movements</h3>
+    {% if recent_movements %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Product</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Notes</th>
+                    <th>Created By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movement in recent_movements %}
+                    <tr>
+                        <td>{{ movement.movement_date|date:"M d, Y" }}</td>
+                        <td>{{ movement.product.item_name }}</td>
+                        <td>
+                            {% if movement.movement_type == 'IN' %}
+                                <span style="color: #080; font-weight: bold;">⬆ Incoming</span>
+                            {% else %}
+                                <span style="color: #d00; font-weight: bold;">⬇ Outgoing</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ movement.quantity }} {{ movement.product.unit_of_measure }}</td>
+                        <td>{{ movement.notes|default:"—" }}</td>
+                        <td>{{ movement.created_by.username|default:"System" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No stock movements recorded yet.</p>
+    {% endif %}
+</div>
+
+<!-- Quick Stats -->
+<div style="margin-top: 30px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9;">
+    <h3>Quick Stats</h3>
+    <p><strong>Total Products:</strong> {{ total_products }}</p>
+    <p><strong>Low Stock Items (< 10):</strong> <span style="{% if low_stock_count > 0 %}color: #d00; font-weight: bold;{% endif %}">{{ low_stock_count }}</span></p>
+</div>
+{% endblock %}

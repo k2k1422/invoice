@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock History - {{ product.item_name }} - Invoice App{% endblock %}
+
+{% block content %}
+<h2>Stock Movement History: {{ product.item_name }}</h2>
+
+<div style="margin: 20px 0;">
+    <a href="{% url 'invoices:inventory_management' %}" class="btn btn-secondary">Back to Inventory</a>
+</div>
+
+<div style="margin: 20px 0; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9;">
+    <h3>Product Information</h3>
+    <p><strong>Item Name:</strong> {{ product.item_name }}</p>
+    <p><strong>Description:</strong> {{ product.description|default:"—" }}</p>
+    <p><strong>Unit of Measure:</strong> {{ product.unit_of_measure }}</p>
+    <p><strong>Unit Price:</strong> ₹{{ product.unit_price }}</p>
+    <p><strong>Current Stock:</strong> <span style="font-size: 1.2em; font-weight: bold; color: #080;">{{ current_stock }}</span> {{ product.unit_of_measure }}</p>
+</div>
+
+<h3>Movement History</h3>
+{% if movement_data %}
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Quantity</th>
+                <th>Running Total</th>
+                <th>Notes</th>
+                <th>Created By</th>
+                <th>Recorded At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in movement_data %}
+                <tr>
+                    <td>{{ item.movement.movement_date|date:"M d, Y" }}</td>
+                    <td>
+                        {% if item.movement.movement_type == 'IN' %}
+                            <span style="color: #080; font-weight: bold;">⬆ Incoming</span>
+                        {% else %}
+                            <span style="color: #d00; font-weight: bold;">⬇ Outgoing</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.movement.movement_type == 'IN' %}
+                            <span style="color: #080;">+{{ item.movement.quantity }}</span>
+                        {% else %}
+                            <span style="color: #d00;">-{{ item.movement.quantity }}</span>
+                        {% endif %}
+                        {{ product.unit_of_measure }}
+                    </td>
+                    <td style="font-weight: bold;">{{ item.running_total }} {{ product.unit_of_measure }}</td>
+                    <td>{{ item.movement.notes|default:"—" }}</td>
+                    <td>{{ item.movement.created_by.username|default:"System" }}</td>
+                    <td>{{ item.movement.created_at|date:"M d, Y H:i" }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p style="text-align: center; margin: 50px 0;">No stock movements recorded for this product yet.</p>
+{% endif %}
+{% endblock %}

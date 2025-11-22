@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Toggle User Status - Invoice App{% endblock %}
+
+{% block content %}
+<h2>{% if user_to_toggle.is_active %}Disable{% else %}Enable{% endif %} User</h2>
+
+<div style="border: 2px solid {% if user_to_toggle.is_active %}#f90{% else %}#080{% endif %}; padding: 20px; margin: 20px 0; background-color: #fff; max-width: 600px;">
+    <h3 style="color: {% if user_to_toggle.is_active %}#f90{% else %}#080{% endif %};">
+        {% if user_to_toggle.is_active %}⚠ Confirm Disable User{% else %}✓ Confirm Enable User{% endif %}
+    </h3>
+    <p>Are you sure you want to {% if user_to_toggle.is_active %}disable{% else %}enable{% endif %} this user?</p>
+    
+    <div style="margin: 20px 0; padding: 15px; border: 1px solid #000;">
+        <p><strong>Username:</strong> {{ user_to_toggle.username }}</p>
+        <p><strong>Name:</strong> {{ user_to_toggle.get_full_name|default:"—" }}</p>
+        <p><strong>Email:</strong> {{ user_to_toggle.email|default:"—" }}</p>
+        <p><strong>Current Status:</strong> 
+            {% if user_to_toggle.is_active %}
+                <span style="color: #080;">Active</span>
+            {% else %}
+                <span style="color: #d00;">Disabled</span>
+            {% endif %}
+        </p>
+    </div>
+    
+    {% if user_to_toggle.is_active %}
+        <p><strong>Note:</strong> Disabled users will not be able to log in to the system.</p>
+    {% else %}
+        <p><strong>Note:</strong> The user will be able to log in again after being enabled.</p>
+    {% endif %}
+    
+    <form method="post" style="margin-top: 20px;">
+        {% csrf_token %}
+        <button type="submit" class="btn" style="background-color: {% if user_to_toggle.is_active %}#f90{% else %}#080{% endif %};">
+            Yes, {% if user_to_toggle.is_active %}Disable{% else %}Enable{% endif %} User
+        </button>
+        <a href="{% url 'invoices:user_management' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -15,8 +15,8 @@
             <tr>
                 <th>Invoice #</th>
                 <th>Client</th>
+                <th>Product</th>
                 <th>Date</th>
-                <th>Due Date</th>
                 <th>Total</th>
                 <th>Actions</th>
             </tr>
@@ -26,9 +26,9 @@
                 <tr>
                     <td>{{ invoice.invoice_number }}</td>
                     <td>{{ invoice.client_name }}</td>
+                    <td>{{ invoice.product.item_name }}</td>
                     <td>{{ invoice.invoice_date }}</td>
-                    <td>{{ invoice.due_date }}</td>
-                    <td>${{ invoice.total|floatformat:2 }}</td>
+                    <td>₹{{ invoice.total|floatformat:2 }}</td>
                     <td>
                         <a href="{% url 'invoices:invoice_detail' invoice.id %}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">View</a>
                         <a href="{% url 'invoices:invoice_print' invoice.id %}" class="btn" style="font-size: 12px; padding: 5px 10px;">Print</a>

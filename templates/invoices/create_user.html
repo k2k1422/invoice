@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Create User - Invoice App{% endblock %}
+
+{% block content %}
+<h2>Create New User</h2>
+
+<div style="max-width: 600px; margin: 20px 0;">
+    <form method="post">
+        {% csrf_token %}
+        
+        <div style="margin-bottom: 20px;">
+            <label for="username" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Username: <span style="color: #d00;">*</span>
+            </label>
+            <input type="text" name="username" id="username" value="{{ username|default:'' }}" required 
+                   style="width: 100%; padding: 8px; border: 1px solid #000;">
+            <small style="display: block; margin-top: 5px; color: #666;">
+                Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.
+            </small>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="email" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Email:
+            </label>
+            <input type="email" name="email" id="email" value="{{ email|default:'' }}" 
+                   style="width: 100%; padding: 8px; border: 1px solid #000;">
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="first_name" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                First Name:
+            </label>
+            <input type="text" name="first_name" id="first_name" value="{{ first_name|default:'' }}" 
+                   style="width: 100%; padding: 8px; border: 1px solid #000;">
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label for="last_name" style="display: block; margin-bottom: 5px; font-weight: bold;">
+                Last Name:
+            </label>
+            <input type="text" name="last_name" id="last_name" value="{{ last_name|default:'' }}" 
+                   style="width: 100%; padding: 8px; border: 1px solid #000;">
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" name="is_staff" id="is_staff" style="margin-right: 10px; width: 20px; height: 20px;">
+                <span style="font-weight: bold;">Admin User (Staff Status)</span>
+            </label>
+            <small style="display: block; margin-top: 5px; color: #666; margin-left: 30px;">
+                Admin users can manage products and other users.
+            </small>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 15px; border: 1px solid #ccc; background-color: #ffe;">
+            <h4>Default Password</h4>
+            <p>New users will be created with the default password: <strong>Welcome@123</strong></p>
+            <p style="margin-top: 10px;">The user will be required to change their password on first login.</p>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <button type="submit" class="btn">Create User</button>
+            <a href="{% url 'invoices:user_management' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

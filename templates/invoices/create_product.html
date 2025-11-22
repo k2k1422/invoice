@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Product - Invoice App{% endblock %}
+
+{% block content %}
+<h2>Create New Product</h2>
+
+<form method="post">
+    {% csrf_token %}
+    
+    <div style="max-width: 600px;">
+        <div style="margin: 20px 0;">
+            <h3>Product Information</h3>
+            
+            <div style="margin: 15px 0;">
+                <label for="{{ form.item_name.id_for_label }}">Item Name: <span style="color: red;">*</span></label>
+                {{ form.item_name }}
+                {% if form.item_name.errors %}
+                    <div style="color: red; font-size: 14px;">{{ form.item_name.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div style="margin: 15px 0;">
+                <label for="{{ form.description.id_for_label }}">Description:</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <div style="color: red; font-size: 14px;">{{ form.description.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div style="margin: 15px 0;">
+                <label for="{{ form.unit_of_measure.id_for_label }}">Unit of Measure: <span style="color: red;">*</span></label>
+                {{ form.unit_of_measure }}
+                <small style="display: block; color: #666; margin-top: 5px;">e.g., pcs, kg, liter, hour, ream</small>
+                {% if form.unit_of_measure.errors %}
+                    <div style="color: red; font-size: 14px;">{{ form.unit_of_measure.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div style="margin: 20px 0;">
+            <h3>Pricing & Status</h3>
+            
+            <div style="margin: 15px 0;">
+                <label for="{{ form.unit_price.id_for_label }}">Unit Price: <span style="color: red;">*</span></label>
+                {{ form.unit_price }}
+                {% if form.unit_price.errors %}
+                    <div style="color: red; font-size: 14px;">{{ form.unit_price.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div style="margin: 15px 0;">
+                <label for="{{ form.is_active.id_for_label }}" style="display: flex; align-items: center;">
+                    {{ form.is_active }}
+                    <span style="margin-left: 10px;">Active</span>
+                </label>
+                {% if form.is_active.errors %}
+                    <div style="color: red; font-size: 14px;">{{ form.is_active.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div style="margin: 15px 0; padding: 10px; border: 1px solid #ccc; background-color: #ffe;">
+                <p><strong>Note:</strong> Stock quantities are managed through the <a href="{% url 'invoices:inventory_management' %}" style="color: #080; font-weight: bold;">Inventory Management</a> section.</p>
+            </div>
+        </div>
+    </div>
+    
+    {% if form.errors %}
+        <div class="alert alert-error">
+            <strong>Please correct the following errors:</strong>
+            {% for field, errors in form.errors.items %}
+                <div>{{ field }}: {{ errors|join:", " }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+    <div style="margin: 20px 0;">
+        <button type="submit" class="btn">Create Product</button>
+        <a href="{% url 'invoices:product_list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<style>
+    .form-check-input {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

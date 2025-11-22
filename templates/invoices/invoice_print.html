@@ -170,14 +170,11 @@
             <div class="bill-to">
                 <h3>Bill To:</h3>
                 <p><strong>{{ invoice.client_name }}</strong></p>
-                <p>{{ invoice.client_email }}</p>
-                <p style="white-space: pre-line;">{{ invoice.client_address }}</p>
             </div>
             
             <div class="invoice-info">
                 <h3>Invoice Details:</h3>
                 <p><strong>Invoice Date:</strong> {{ invoice.invoice_date }}</p>
-                <p><strong>Due Date:</strong> {{ invoice.due_date }}</p>
                 <p><strong>Created:</strong> {{ invoice.created_at|date:"M d, Y" }}</p>
             </div>
         </div>
@@ -185,6 +182,7 @@
         <table>
             <thead>
                 <tr>
+                    <th>Item</th>
                     <th>Description</th>
                     <th>Quantity</th>
                     <th>Unit Price</th>
@@ -193,10 +191,11 @@
             </thead>
             <tbody>
                 <tr>
-                    <td>{{ invoice.description }}</td>
-                    <td>{{ invoice.quantity }}</td>
-                    <td>${{ invoice.unit_price }}</td>
-                    <td>${{ invoice.subtotal|floatformat:2 }}</td>
+                    <td>{{ invoice.product.item_name }}</td>
+                    <td>{{ invoice.product.description|default:"N/A" }}</td>
+                    <td>{{ invoice.quantity }} {{ invoice.product.unit_of_measure }}</td>
+                    <td>₹{{ invoice.unit_price|floatformat:2 }}</td>
+                    <td>₹{{ invoice.subtotal|floatformat:2 }}</td>
                 </tr>
             </tbody>
         </table>

@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}All Invoices - Admin - Invoice App{% endblock %}
+
+{% block content %}
+<h2>All Invoices (Admin View)</h2>
+
+<div style="margin: 20px 0;">
+    <a href="{% url 'invoices:create_invoice' %}" class="btn">Create New Invoice</a>
+    <a href="{% url 'invoices:home' %}" class="btn btn-secondary">Back to Home</a>
+</div>
+
+<!-- Filter Section -->
+<div style="margin: 20px 0; padding: 20px; border: 1px solid #ccc; background-color: #f9f9f9;">
+    <h3>Filters</h3>
+    <form method="get" style="display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap;">
+        <div>
+            <label for="user" style="display: block; margin-bottom: 5px; font-weight: bold;">User:</label>
+            <select name="user" id="user" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 200px;">
+                <option value="all" {% if selected_user == 'all' %}selected{% endif %}>All Users</option>
+                {% for user in users %}
+                    <option value="{{ user.id }}" {% if selected_user == user.id|stringformat:"s" %}selected{% endif %}>
+                        {{ user.username }} ({{ user.get_full_name|default:user.email }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div>
+            <label for="date_range" style="display: block; margin-bottom: 5px; font-weight: bold;">Time Range:</label>
+            <select name="date_range" id="date_range" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; min-width: 200px;">
+                <option value="7" {% if selected_date_range == '7' %}selected{% endif %}>Last 7 Days</option>
+                <option value="30" {% if selected_date_range == '30' %}selected{% endif %}>Last 30 Days</option>
+                <option value="60" {% if selected_date_range == '60' %}selected{% endif %}>Last 60 Days</option>
+                <option value="90" {% if selected_date_range == '90' %}selected{% endif %}>Last 90 Days</option>
+                <option value="180" {% if selected_date_range == '180' %}selected{% endif %}>Last 6 Months</option>
+                <option value="365" {% if selected_date_range == '365' %}selected{% endif %}>Last Year</option>
+                <option value="all" {% if selected_date_range == 'all' %}selected{% endif %}>All Time</option>
+            </select>
+        </div>
+        
+        <div>
+            <button type="submit" class="btn" style="margin: 0;">Apply Filters</button>
+            <a href="{% url 'invoices:admin_invoice_list' %}" class="btn btn-secondary" style="margin: 0;">Reset</a>
+        </div>
+    </form>
+</div>
+
+{% if invoices %}
+    <table>
+        <thead>
+            <tr>
+                <th>Invoice #</th>
+                <th>User</th>
+                <th>Client</th>
+                <th>Product</th>
+                <th>Date</th>
+                <th>Total</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for invoice in invoices %}
+                <tr>
+                    <td>{{ invoice.invoice_number }}</td>
+                    <td>{{ invoice.user.username }}</td>
+                    <td>{{ invoice.client_name }}</td>
+                    <td>{{ invoice.product.item_name }}</td>
+                    <td>{{ invoice.invoice_date }}</td>
+                    <td>₹{{ invoice.total|floatformat:2 }}</td>
+                    <td>
+                        <a href="{% url 'invoices:invoice_detail' invoice.id %}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">View</a>
+                        <a href="{% url 'invoices:invoice_print' invoice.id %}" class="btn" style="font-size: 12px; padding: 5px 10px;">Print</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div style="text-align: center; margin: 50px 0;">
+        <p>No invoices found matching the selected filters.</p>
+        <a href="{% url 'invoices:admin_invoice_list' %}" class="btn">Reset Filters</a>
+    </div>
+{% endif %}
+
+<div style="margin-top: 30px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9;">
+    <h3>Quick Stats</h3>
+    <p><strong>Total Invoices:</strong> {{ total_count }}</p>
+    <p><strong>Total Amount:</strong> ₹{{ total_amount|floatformat:2 }}</p>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Invoice App{% endblock %}
+
+{% block content %}
+<h2>User Management</h2>
+
+<div style="margin: 20px 0;">
+    <a href="{% url 'invoices:create_user' %}" class="btn">Create New User</a>
+    <a href="{% url 'invoices:home' %}" class="btn btn-secondary">Back to Home</a>
+</div>
+
+{% if users %}
+    <table>
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Role</th>
+                <th>Date Joined</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user_item in users %}
+                <tr>
+                    <td><strong>{{ user_item.username }}</strong></td>
+                    <td>{{ user_item.get_full_name|default:"—" }}</td>
+                    <td>{{ user_item.email|default:"—" }}</td>
+                    <td>
+                        {% if user_item.is_active %}
+                            <span style="color: #080;">✓ Active</span>
+                        {% else %}
+                            <span style="color: #d00;">✗ Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user_item.is_superuser %}
+                            <span style="color: #d00;">Superuser</span>
+                        {% elif user_item.is_staff %}
+                            <span style="color: #080;">Admin</span>
+                        {% else %}
+                            User
+                        {% endif %}
+                    </td>
+                    <td>{{ user_item.date_joined|date:"M d, Y" }}</td>
+                    <td>
+                        <a href="{% url 'invoices:reset_user_password' user_item.id %}" class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;">Reset Password</a>
+                        
+                        {% if user_item.id != user.id %}
+                            {% if user_item.is_active %}
+                                <a href="{% url 'invoices:toggle_user_status' user_item.id %}" class="btn" style="font-size: 12px; padding: 5px 10px; background-color: #f90;">Disable</a>
+                            {% else %}
+                                <a href="{% url 'invoices:toggle_user_status' user_item.id %}" class="btn" style="font-size: 12px; padding: 5px 10px; background-color: #080;">Enable</a>
+                            {% endif %}
+                            <a href="{% url 'invoices:delete_user' user_item.id %}" class="btn" style="font-size: 12px; padding: 5px 10px; background-color: #d00;">Delete</a>
+                        {% else %}
+                            <span style="font-size: 12px; color: #999;">(You)</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div style="text-align: center; margin: 50px 0;">
+        <p>No users found.</p>
+    </div>
+{% endif %}
+
+<div style="margin-top: 30px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9;">
+    <h3>Quick Stats</h3>
+    <p><strong>Total Users:</strong> {{ total_count }}</p>
+    <p><strong>Active Users:</strong> {{ active_count }}</p>
+    <p><strong>Disabled Users:</strong> {{ inactive_count }}</p>
+    <p><strong>Admin Users:</strong> {{ staff_count }}</p>
+</div>
+{% endblock %}

@@ -25,7 +25,9 @@ SECRET_KEY = 'django-insecure-w^r7auy)igomrdhgf)0r*k)++%u@0l_gmi5v&@%y%ew1^z(!m0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Allow access from any host (including IPv6)
+# For production, replace '*' with your specific domain/IP
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -48,6 +50,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'invoices.middleware.PasswordChangeMiddleware',
 ]
 
 ROOT_URLCONF = 'invoice_app.urls'
