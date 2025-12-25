@@ -19,6 +19,8 @@ interface Invoice {
 interface InvoiceStats {
   total_count: number;
   total_amount: number;
+  total_cash_amount: number;
+  total_online_amount: number;
   users: Array<{ id: number; username: string }>;
 }
 
@@ -26,7 +28,7 @@ const InvoicesPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [stats, setStats] = useState<InvoiceStats>({ total_count: 0, total_amount: 0, users: [] });
+  const [stats, setStats] = useState<InvoiceStats>({ total_count: 0, total_amount: 0, total_cash_amount: 0, total_online_amount: 0, users: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({ user_id: 'all', date_range: '30', from_date: '', to_date: '' });
@@ -85,6 +87,14 @@ const InvoicesPage: React.FC = () => {
             <Paper sx={{ p: 2, flex: 1 }}>
               <Typography variant="h6">₹{stats.total_amount.toFixed(2)}</Typography>
               <Typography variant="body2" color="text.secondary">Total Amount</Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1 }}>
+              <Typography variant="h6">₹{stats.total_cash_amount.toFixed(2)}</Typography>
+              <Typography variant="body2" color="text.secondary">Cash Payments</Typography>
+            </Paper>
+            <Paper sx={{ p: 2, flex: 1 }}>
+              <Typography variant="h6">₹{stats.total_online_amount.toFixed(2)}</Typography>
+              <Typography variant="body2" color="text.secondary">Online Payments</Typography>
             </Paper>
           </Box>
 

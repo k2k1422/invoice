@@ -441,6 +441,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         total_count = queryset.count()
         total_amount = sum(invoice.total for invoice in queryset)
         
+        # Calculate cash and online payment totals
+        cash_invoices = queryset.filter(payment_type='cash')
+        online_invoices = queryset.filter(payment_type='online')
+        
+        total_cash_amount = sum(invoice.total for invoice in cash_invoices)
+        total_online_amount = sum(invoice.total for invoice in online_invoices)
+        
         # Get users who have created invoices in this business
         users_with_invoices = User.objects.filter(
             id__in=queryset.values_list('user_id', flat=True).distinct()
@@ -449,6 +456,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return Response({
             'total_count': total_count,
             'total_amount': float(total_amount),
+            'total_cash_amount': float(total_cash_amount),
+            'total_online_amount': float(total_online_amount),
             'users': list(users_with_invoices)
         })
 
