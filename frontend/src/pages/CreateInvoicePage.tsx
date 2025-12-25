@@ -28,7 +28,8 @@ const CreateInvoicePage: React.FC = () => {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     client_name: '',
-    invoice_date: new Date().toISOString().split('T')[0]
+    invoice_date: new Date().toISOString().split('T')[0],
+    payment_type: 'cash'
   });
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', product: '', quantity: '', unit_price: 0, unit_of_measure: '', product_name: '' }
@@ -118,6 +119,7 @@ const CreateInvoicePage: React.FC = () => {
       const response = await axios.post('/invoices/', {
         client_name: formData.client_name,
         invoice_date: formData.invoice_date,
+        payment_type: formData.payment_type,
         items: items.map(item => ({
           product: item.product,
           quantity: item.quantity,
@@ -160,6 +162,19 @@ const CreateInvoicePage: React.FC = () => {
             InputLabelProps={{ shrink: true }}
             required
           />
+
+          <TextField
+            fullWidth
+            select
+            label="Payment Type"
+            value={formData.payment_type}
+            onChange={(e) => setFormData({ ...formData, payment_type: e.target.value })}
+            margin="normal"
+            required
+          >
+            <MenuItem value="cash">Cash</MenuItem>
+            <MenuItem value="online">Online Payment</MenuItem>
+          </TextField>
 
           <Divider sx={{ my: 3 }} />
 

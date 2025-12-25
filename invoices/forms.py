@@ -6,10 +6,11 @@ class InvoiceForm(forms.ModelForm):
     
     class Meta:
         model = Invoice
-        fields = ['client_name', 'invoice_date']
+        fields = ['client_name', 'invoice_date', 'payment_type']
         widgets = {
             'client_name': forms.TextInput(attrs={'class': 'form-control'}),
             'invoice_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'payment_type': forms.Select(attrs={'class': 'form-control'}),
         }
     
     def __init__(self, *args, **kwargs):

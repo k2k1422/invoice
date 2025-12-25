@@ -159,6 +159,11 @@ class StockMovement(models.Model):
 
 class Invoice(models.Model):
     """Invoice model - header information"""
+    PAYMENT_TYPE_CHOICES = [
+        ('cash', 'Cash'),
+        ('online', 'Online Payment'),
+    ]
+    
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='invoices')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     
@@ -168,6 +173,7 @@ class Invoice(models.Model):
     # Invoice details
     invoice_number = models.CharField(max_length=50, blank=True)
     invoice_date = models.DateField(default=date.today)
+    payment_type = models.CharField(max_length=10, choices=PAYMENT_TYPE_CHOICES, default='cash')
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

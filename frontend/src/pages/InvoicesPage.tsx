@@ -13,6 +13,7 @@ interface Invoice {
   total: number;
   invoice_date: string;
   user: number;
+  payment_type: string;
 }
 
 interface InvoiceStats {
@@ -138,6 +139,7 @@ const InvoicesPage: React.FC = () => {
               <TableCell><strong>Invoice Number</strong></TableCell>
               <TableCell><strong>Client Name</strong></TableCell>
               <TableCell><strong>Items</strong></TableCell>
+              <TableCell><strong>Payment</strong></TableCell>
               <TableCell align="right"><strong>Total (₹)</strong></TableCell>
               <TableCell><strong>Date</strong></TableCell>
             </TableRow>
@@ -152,6 +154,13 @@ const InvoicesPage: React.FC = () => {
                   <TableCell>{invoice.client_name}</TableCell>
                   <TableCell>
                     {itemsCount === 1 ? firstItem?.product_name : `${itemsCount} items`}
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={invoice.payment_type === 'cash' ? 'Cash' : 'Online'} 
+                      color={invoice.payment_type === 'cash' ? 'default' : 'success'} 
+                      size="small" 
+                    />
                   </TableCell>
                   <TableCell align="right">₹{Number(invoice.total).toFixed(2)}</TableCell>
                   <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>

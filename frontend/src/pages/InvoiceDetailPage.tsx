@@ -24,6 +24,7 @@ interface InvoiceDetail {
   total: number;
   invoice_date: string;
   user_username: string;
+  payment_type: string;
 }
 
 const InvoiceDetailPage: React.FC = () => {
@@ -73,6 +74,12 @@ const InvoiceDetailPage: React.FC = () => {
           <Box>
             <Typography variant="body2" color="text.secondary">Invoice Date:</Typography>
             <Typography variant="body1">{new Date(invoice.invoice_date).toLocaleDateString()}</Typography>
+          </Box>
+          <Box textAlign="center">
+            <Typography variant="body2" color="text.secondary">Payment Type:</Typography>
+            <Typography variant="body1" fontWeight="bold">
+              {invoice.payment_type === 'cash' ? 'Cash' : 'Online Payment'}
+            </Typography>
           </Box>
           <Box textAlign="right">
             <Typography variant="body2" color="text.secondary">Issued By:</Typography>
