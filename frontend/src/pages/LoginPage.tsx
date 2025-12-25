@@ -27,7 +27,7 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(username, password);
-      navigate('/');
+      navigate('/business/select');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {
