@@ -24,12 +24,14 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import PeopleIcon from '@mui/icons-material/People';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import BusinessIcon from '@mui/icons-material/Business';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../contexts/AuthContext';
 
 const drawerWidth = 240;
 
 const Layout: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, currentBusiness } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -64,8 +66,12 @@ const Layout: React.FC = () => {
     { text: 'Products', icon: <InventoryIcon />, path: '/products', show: true },
     { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', show: true },
     { text: 'Invoices', icon: <ReceiptIcon />, path: '/invoices', show: true },
-    { text: 'Manage Users', icon: <PeopleIcon />, path: '/users', show: user?.is_staff },
   ];
+
+  const handleSwitchBusiness = () => {
+    navigate('/business/select');
+    if (isMobile) handleDrawerToggle();
+  };
 
   const drawer = (
     <div>
@@ -84,6 +90,21 @@ const Layout: React.FC = () => {
             </ListItemButton>
           </ListItem>
         ))}
+      </List>
+      <Divider />
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleSwitchBusiness}>
+            <ListItemIcon><BusinessIcon /></ListItemIcon>
+            <ListItemText primary="Switch Business" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleLogout}>
+            <ListItemIcon><LogoutIcon /></ListItemIcon>
+            <ListItemText primary="Logout" />
+          </ListItemButton>
+        </ListItem>
       </List>
     </div>
   );
@@ -107,6 +128,11 @@ const Layout: React.FC = () => {
           )}
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Invoice Management System
+            {currentBusiness && (
+              <Typography variant="caption" display="block" sx={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                {currentBusiness.name}
+              </Typography>
+            )}
           </Typography>
           <IconButton color="inherit" onClick={handleMenuOpen}>
             <AccountCircleIcon />
@@ -119,6 +145,11 @@ const Layout: React.FC = () => {
             open={Boolean(anchorEl)}
             onClose={handleMenuClose}
           >
+            {currentBusiness && (
+              <MenuItem onClick={() => { navigate('/business/select'); handleMenuClose(); }}>
+                Switch Business
+              </MenuItem>
+            )}
             <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
             <MenuItem onClick={handleLogout}>Logout</MenuItem>
           </Menu>

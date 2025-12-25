@@ -8,39 +8,271 @@ from django_filters.rest_framework import DjangoFilterBackend
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from .models import Product, StockMovement, Invoice, InvoiceItem, UserProfile
+from .models import Product, StockMovement, Invoice, InvoiceItem, UserProfile, Business, BusinessMembership
 from .serializers import (
     ProductSerializer, StockMovementSerializer, InvoiceSerializer,
     UserSerializer, UserCreateSerializer, PasswordChangeSerializer,
-    ProductStockHistorySerializer
+    ProductStockHistorySerializer, BusinessSerializer, BusinessCreateSerializer,
+    AddMemberSerializer, BusinessListSerializer
 )
-from .permissions import IsStaffUser, IsOwnerOrStaff, CannotModifySelf
+from .permissions import IsStaffUser, IsOwnerOrStaff, CannotModifySelf, IsSuperUser, HasBusinessAccess
+from .middleware import BUSINESS_ID_SESSION_KEY
+
+
+class BusinessViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Business operations with role-based permissions.
+    - Superusers can create businesses and manage all memberships
+    - Business admins can manage members in their businesses
+    - Normal users can only view businesses they belong to
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Return businesses based on user role"""
+        if self.request.user.is_superuser:
+            # Superusers see all businesses
+            return Business.objects.all().order_by('name')
+        else:
+            # Normal users see only their businesses
+            return Business.objects.filter(
+                memberships__user=self.request.user
+            ).distinct().order_by('name')
+    
+    def get_serializer_class(self):
+        """Use different serializers for different actions"""
+        if self.action == 'create':
+            return BusinessCreateSerializer
+        elif self.action == 'list':
+            return BusinessListSerializer
+        return BusinessSerializer
+    
+    def get_permissions(self):
+        """Only superusers can create businesses"""
+        if self.action == 'create':
+            return [IsAuthenticated(), IsSuperUser()]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            # For update/delete, check in perform methods
+            return [IsAuthenticated()]
+        return [IsAuthenticated()]
+    
+    def perform_update(self, serializer):
+        """Only superusers and business admins can update"""
+        business = self.get_object()
+        user = self.request.user
+        
+        # Superusers can update any business
+        if user.is_superuser:
+            serializer.save()
+            return
+        
+        # Check if user is admin of this business
+        membership = business.memberships.filter(user=user, role='admin').first()
+        if membership:
+            serializer.save()
+            return
+        
+        # Otherwise, deny
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied("Only superusers and business admins can update businesses.")
+    
+    def perform_destroy(self, instance):
+        """Only superusers can delete businesses"""
+        if not self.request.user.is_superuser:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only superusers can delete businesses.")
+        instance.delete()
+    
+    @action(detail=True, methods=['post'])
+    def select(self, request, pk=None):
+        """Select a business and store in session"""
+        business = self.get_object()
+        
+        # Verify user has access to this business
+        if not business.memberships.filter(user=request.user).exists():
+            return Response(
+                {'detail': 'You do not have access to this business.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Store in session
+        request.session[BUSINESS_ID_SESSION_KEY] = business.id
+        
+        return Response({
+            'id': business.id,
+            'name': business.name,
+            'description': business.description
+        })
+    
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """Get currently selected business"""
+        if hasattr(request, 'business') and request.business:
+            serializer = BusinessSerializer(request.business, context={'request': request})
+            return Response(serializer.data)
+        # Return 204 No Content instead of 400 when no business selected
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=True, methods=['post'])
+    def add_member(self, request, pk=None):
+        """Add a member to the business (superuser or admin only)"""
+        business = self.get_object()
+        user = request.user
+        
+        # Check permissions: superuser or business admin
+        if not user.is_superuser:
+            membership = business.memberships.filter(user=user, role='admin').first()
+            if not membership:
+                return Response(
+                    {'detail': 'Only superusers and business admins can add members.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # Validate input
+        serializer = AddMemberSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        user_id = serializer.validated_data['user_id']
+        role = serializer.validated_data['role']
+        
+        # Check if user already a member
+        target_user = User.objects.get(id=user_id)
+        if business.memberships.filter(user=target_user).exists():
+            return Response(
+                {'detail': 'User is already a member of this business.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Add member
+        membership = BusinessMembership.objects.create(
+            business=business,
+            user=target_user,
+            role=role
+        )
+        
+        from .serializers import BusinessMembershipSerializer
+        return Response(
+            BusinessMembershipSerializer(membership).data,
+            status=status.HTTP_201_CREATED
+        )
+    
+    @action(detail=True, methods=['delete'], url_path='remove_member/(?P<user_id>[^/.]+)')
+    def remove_member(self, request, pk=None, user_id=None):
+        """Remove a member from the business (superuser or admin only)"""
+        business = self.get_object()
+        user = request.user
+        
+        # Check permissions: superuser or business admin
+        if not user.is_superuser:
+            membership = business.memberships.filter(user=user, role='admin').first()
+            if not membership:
+                return Response(
+                    {'detail': 'Only superusers and business admins can remove members.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # Get the membership to remove
+        try:
+            target_membership = business.memberships.get(user_id=user_id)
+        except BusinessMembership.DoesNotExist:
+            return Response(
+                {'detail': 'User is not a member of this business.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Prevent removing the last admin
+        if target_membership.role == 'admin':
+            admin_count = business.memberships.filter(role='admin').count()
+            if admin_count <= 1:
+                return Response(
+                    {'detail': 'Cannot remove the last admin from the business.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        target_membership.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=True, methods=['patch'], url_path='update_role/(?P<user_id>[^/.]+)')
+    def update_role(self, request, pk=None, user_id=None):
+        """Update a member's role (superuser or admin only)"""
+        business = self.get_object()
+        user = request.user
+        
+        # Check permissions: superuser or business admin
+        if not user.is_superuser:
+            membership = business.memberships.filter(user=user, role='admin').first()
+            if not membership:
+                return Response(
+                    {'detail': 'Only superusers and business admins can update roles.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # Get the membership to update
+        try:
+            target_membership = business.memberships.get(user_id=user_id)
+        except BusinessMembership.DoesNotExist:
+            return Response(
+                {'detail': 'User is not a member of this business.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get new role
+        new_role = request.data.get('role')
+        if new_role not in ['admin', 'member']:
+            return Response(
+                {'detail': 'Invalid role. Must be "admin" or "member".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # If demoting from admin, check we're not removing the last admin
+        if target_membership.role == 'admin' and new_role == 'member':
+            admin_count = business.memberships.filter(role='admin').count()
+            if admin_count <= 1:
+                return Response(
+                    {'detail': 'Cannot demote the last admin of the business.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        target_membership.role = new_role
+        target_membership.save()
+        
+        from .serializers import BusinessMembershipSerializer
+        return Response(BusinessMembershipSerializer(target_membership).data)
 
 
 class ProductViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Product CRUD operations.
-    List and retrieve: all authenticated users
-    Create, update, delete: staff only
+    List and retrieve: all authenticated users with business access
+    Create, update, delete: staff only with business access
     """
-    queryset = Product.objects.all().order_by('item_name')
     serializer_class = ProductSerializer
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active']
     search_fields = ['item_name', 'description']
     ordering_fields = ['item_name', 'unit_price', 'created_at']
     
+    def get_queryset(self):
+        """Filter products by current business"""
+        if hasattr(self.request, 'business') and self.request.business:
+            return Product.objects.filter(business=self.request.business).order_by('item_name')
+        return Product.objects.none()
+    
     def get_permissions(self):
-        """Staff only for create, update, delete"""
+        """Staff only for create, update, delete + business access required"""
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAuthenticated(), IsStaffUser()]
-        return [IsAuthenticated()]
+            return [IsAuthenticated(), IsStaffUser(), HasBusinessAccess()]
+        return [IsAuthenticated(), HasBusinessAccess()]
     
     @action(detail=True, methods=['get'])
     def stock_history(self, request, pk=None):
         """Get stock movement history for a product with running totals"""
         product = self.get_object()
-        movements = StockMovement.objects.filter(product=product).order_by('movement_date', 'created_at')
+        movements = StockMovement.objects.filter(
+            product=product,
+            business=request.business
+        ).order_by('movement_date', 'created_at')
         
         # Calculate running totals
         running_total = Decimal('0')
@@ -63,16 +295,19 @@ class ProductViewSet(viewsets.ModelViewSet):
             })
         
         # Subtract invoice quantities
-        invoices = Invoice.objects.filter(product=product).order_by('invoice_date', 'created_at')
-        for invoice in invoices:
-            running_total -= invoice.quantity
+        invoices_qs = InvoiceItem.objects.filter(
+            product=product,
+            invoice__business=request.business
+        ).select_related('invoice', 'invoice__user').order_by('invoice__invoice_date', 'invoice__created_at')
+        for item in invoices_qs:
+            running_total -= item.quantity
             history_data.append({
                 'movement_type': 'SALE',
-                'quantity': invoice.quantity,
-                'movement_date': invoice.invoice_date,
-                'notes': f'Invoice {invoice.invoice_number} - {invoice.client_name}',
-                'created_by_username': invoice.user.username,
-                'created_at': invoice.created_at,
+                'quantity': item.quantity,
+                'movement_date': item.invoice.invoice_date,
+                'notes': f'Invoice {item.invoice.invoice_number} - {item.invoice.client_name}',
+                'created_by_username': item.invoice.user.username,
+                'created_at': item.invoice.created_at,
                 'running_total': running_total
             })
         
@@ -86,25 +321,26 @@ class ProductViewSet(viewsets.ModelViewSet):
 class StockMovementViewSet(viewsets.ModelViewSet):
     """
     ViewSet for StockMovement operations.
-    List and retrieve: all authenticated users
-    Create: staff only
+    List and retrieve: all authenticated users with business access
+    Create: staff only with business access
     Update, delete: not allowed
     """
-    queryset = StockMovement.objects.all().order_by('-movement_date', '-created_at')
     serializer_class = StockMovementSerializer
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['product', 'movement_type', 'movement_date']
     ordering_fields = ['movement_date', 'created_at']
     
-    def get_permissions(self):
-        """Staff only for create"""
-        if self.action == 'create':
-            return [IsAuthenticated(), IsStaffUser()]
-        return [IsAuthenticated()]
-    
     def get_queryset(self):
-        """Optionally filter recent movements"""
-        queryset = super().get_queryset()
+        """Filter stock movements by current business"""
+        if hasattr(self.request, 'business') and self.request.business:
+            queryset = StockMovement.objects.filter(
+                business=self.request.business
+            ).order_by('-movement_date', '-created_at')
+        else:
+            queryset = StockMovement.objects.none()
+        
+        # Optionally filter recent movements
         recent = self.request.query_params.get('recent', None)
         if recent:
             try:
@@ -113,6 +349,12 @@ class StockMovementViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
         return queryset
+    
+    def get_permissions(self):
+        """Staff only for create + business access required"""
+        if self.action == 'create':
+            return [IsAuthenticated(), IsStaffUser(), HasBusinessAccess()]
+        return [IsAuthenticated(), HasBusinessAccess()]
     
     # Disable update and delete
     def update(self, request, *args, **kwargs):
@@ -131,8 +373,10 @@ class StockMovementViewSet(viewsets.ModelViewSet):
 class InvoiceViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Invoice operations.
+    Requires business access for all operations.
     """
     serializer_class = InvoiceSerializer
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['invoice_date']
     ordering_fields = ['invoice_date', 'created_at', 'invoice_number']
@@ -141,9 +385,17 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """
         Regular users see only their invoices.
         Staff users see all invoices with optional filters.
+        All filtered by current business.
         """
         user = self.request.user
-        queryset = Invoice.objects.prefetch_related('items', 'items__product').all().order_by('-invoice_date', '-created_at')
+        
+        # Filter by business first
+        if hasattr(self.request, 'business') and self.request.business:
+            queryset = Invoice.objects.filter(
+                business=self.request.business
+            ).prefetch_related('items', 'items__product').order_by('-invoice_date', '-created_at')
+        else:
+            queryset = Invoice.objects.none()
         
         if not user.is_staff:
             # Regular users only see their own invoices
@@ -189,7 +441,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         total_count = queryset.count()
         total_amount = sum(invoice.total for invoice in queryset)
         
-        # Get users who have created invoices
+        # Get users who have created invoices in this business
         users_with_invoices = User.objects.filter(
             id__in=queryset.values_list('user_id', flat=True).distinct()
         ).values('id', 'username')
@@ -211,6 +463,21 @@ class UserViewSet(viewsets.ModelViewSet):
     search_fields = ['username', 'email', 'first_name', 'last_name']
     ordering_fields = ['username', 'date_joined']
     
+    def get_queryset(self):
+        """
+        Filter users based on permissions:
+        - Superusers see all users
+        - Staff users see only non-superusers
+        """
+        queryset = super().get_queryset()
+        
+        # Superusers can see all users
+        if self.request.user.is_superuser:
+            return queryset
+        
+        # Staff users cannot see superusers
+        return queryset.filter(is_superuser=False)
+    
     def get_serializer_class(self):
         if self.action == 'create':
             return UserCreateSerializer
@@ -219,10 +486,19 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Get user statistics"""
-        total_users = User.objects.count()
-        active_users = User.objects.filter(is_active=True).count()
-        staff_users = User.objects.filter(is_staff=True).count()
-        users_need_password_change = UserProfile.objects.filter(must_change_password=True).count()
+        # Filter based on permissions
+        if request.user.is_superuser:
+            queryset = User.objects.all()
+        else:
+            queryset = User.objects.filter(is_superuser=False)
+        
+        total_users = queryset.count()
+        active_users = queryset.filter(is_active=True).count()
+        staff_users = queryset.filter(is_staff=True).count()
+        users_need_password_change = UserProfile.objects.filter(
+            must_change_password=True,
+            user__in=queryset
+        ).count()
         
         return Response({
             'total_users': total_users,
@@ -319,7 +595,10 @@ class InventoryViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def overview(self, request):
         """Get inventory overview with stats"""
-        products = Product.objects.filter(is_active=True)
+        if hasattr(request, 'business') and request.business:
+            products = Product.objects.filter(business=request.business, is_active=True)
+        else:
+            products = Product.objects.none()
         
         inventory_data = []
         low_stock_count = 0
@@ -338,8 +617,13 @@ class InventoryViewSet(viewsets.ViewSet):
                 'stock_status': 'low' if stock < 10 else 'medium' if stock < 50 else 'good'
             })
         
-        # Get recent movements
-        recent_movements = StockMovement.objects.all().order_by('-movement_date', '-created_at')[:50]
+        # Get recent movements for this business
+        if hasattr(request, 'business') and request.business:
+            recent_movements = StockMovement.objects.filter(
+                business=request.business
+            ).order_by('-movement_date', '-created_at')[:50]
+        else:
+            recent_movements = StockMovement.objects.none()
         movements_data = StockMovementSerializer(recent_movements, many=True).data
         
         return Response({

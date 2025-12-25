@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile, Product, StockMovement, Invoice, InvoiceItem
+from .models import UserProfile, Product, StockMovement, Invoice, InvoiceItem, Business, BusinessMembership
 from decimal import Decimal
 
 
@@ -15,15 +15,23 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model with profile"""
     profile = UserProfileSerializer(read_only=True)
     full_name = serializers.SerializerMethodField()
+    must_change_password = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 
-                  'full_name', 'is_staff', 'is_active', 'date_joined', 'profile']
+                  'full_name', 'is_staff', 'is_active', 'is_superuser', 'date_joined', 
+                  'profile', 'must_change_password']
         read_only_fields = ['id', 'date_joined']
     
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.username
+    
+    def get_must_change_password(self, obj):
+        """Get must_change_password from user profile"""
+        if hasattr(obj, 'profile'):
+            return obj.profile.must_change_password
+        return False
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -39,6 +47,12 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_quantity_in_stock(self, obj):
         """Calculate stock quantity dynamically"""
         return float(obj.quantity_in_stock)
+    
+    def create(self, validated_data):
+        """Set business from request context"""
+        if hasattr(self.context['request'], 'business'):
+            validated_data['business'] = self.context['request'].business
+        return super().create(validated_data)
 
 
 class StockMovementSerializer(serializers.ModelSerializer):
@@ -53,8 +67,10 @@ class StockMovementSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_by', 'created_by_username', 'created_at']
     
     def create(self, validated_data):
-        """Set created_by to current user"""
+        """Set created_by and business to current user/business"""
         validated_data['created_by'] = self.context['request'].user
+        if hasattr(self.context['request'], 'business'):
+            validated_data['business'] = self.context['request'].business
         return super().create(validated_data)
 
 
@@ -104,6 +120,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
         """Create invoice with line items"""
         items_data = validated_data.pop('items')
         validated_data['user'] = self.context['request'].user
+        if hasattr(self.context['request'], 'business'):
+            validated_data['business'] = self.context['request'].business
         invoice = Invoice.objects.create(**validated_data)
         
         for item_data in items_data:
@@ -196,3 +214,91 @@ class ProductStockHistorySerializer(serializers.Serializer):
     created_by_username = serializers.CharField()
     created_at = serializers.DateTimeField()
     running_total = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class BusinessMembershipSerializer(serializers.ModelSerializer):
+    """Serializer for BusinessMembership with user details"""
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = BusinessMembership
+        fields = ['id', 'user_id', 'username', 'email', 'full_name', 'role', 'created_at']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+
+class BusinessListSerializer(serializers.ModelSerializer):
+    """Simple serializer for listing businesses"""
+    member_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Business
+        fields = ['id', 'name', 'description', 'member_count']
+        read_only_fields = ['id']
+    
+    def get_member_count(self, obj):
+        return obj.memberships.count()
+
+
+class BusinessSerializer(serializers.ModelSerializer):
+    """Serializer for Business with member information"""
+    members = BusinessMembershipSerializer(source='memberships', many=True, read_only=True)
+    member_count = serializers.SerializerMethodField()
+    user_role = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Business
+        fields = ['id', 'name', 'description', 'created_at', 'members', 'member_count', 'user_role']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_member_count(self, obj):
+        return obj.memberships.count()
+    
+    def get_user_role(self, obj):
+        """Get current user's role in this business"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            membership = obj.memberships.filter(user=request.user).first()
+            return membership.role if membership else None
+        return None
+
+
+class BusinessCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating a new business"""
+    class Meta:
+        model = Business
+        fields = ['name', 'description']
+    
+    def create(self, validated_data):
+        """Create business and add creator as admin"""
+        business = Business.objects.create(**validated_data)
+        
+        # Add the creator as an admin
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            BusinessMembership.objects.create(
+                business=business,
+                user=request.user,
+                role='admin'
+            )
+        
+        return business
+
+
+class AddMemberSerializer(serializers.Serializer):
+    """Serializer for adding a member to a business"""
+    user_id = serializers.IntegerField()
+    role = serializers.ChoiceField(choices=['admin', 'member'], default='member')
+    
+    def validate_user_id(self, value):
+        """Validate that user exists"""
+        try:
+            User.objects.get(id=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+        return value

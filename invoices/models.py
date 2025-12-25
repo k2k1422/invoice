@@ -7,6 +7,45 @@ from datetime import date
 from django.db import transaction
 
 
+class Business(models.Model):
+    """Business/Organization model - top-level tenant separation"""
+    name = models.CharField(max_length=200, unique=True)
+    description = models.TextField(blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name_plural = "Businesses"
+        ordering = ['name']
+    
+    def __str__(self):
+        return self.name
+
+
+class BusinessMembership(models.Model):
+    """Intermediate model for User-Business many-to-many relationship"""
+    ROLE_CHOICES = [
+        ('admin', 'Administrator'),
+        ('member', 'Member'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='business_memberships')
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='memberships')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='member')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = [['user', 'business']]
+        ordering = ['business__name']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.business.name} ({self.role})"
+
+
 class UserProfile(models.Model):
     """Extended user profile to track password change requirement"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -14,6 +53,10 @@ class UserProfile(models.Model):
     
     def __str__(self):
         return f"Profile for {self.user.username}"
+    
+    def get_businesses(self):
+        """Get all businesses this user has access to"""
+        return Business.objects.filter(memberships__user=self.user)
 
 
 @receiver(post_save, sender=User)
@@ -33,7 +76,8 @@ def save_user_profile(sender, instance, **kwargs):
 
 class Product(models.Model):
     """Inventory/Product model - only admin users can create and modify"""
-    item_name = models.CharField(max_length=200, unique=True)
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='products')
+    item_name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     unit_of_measure = models.CharField(
         max_length=50,
@@ -51,23 +95,27 @@ class Product(models.Model):
     
     class Meta:
         ordering = ['item_name']
+        unique_together = [['business', 'item_name']]
     
     @property
     def quantity_in_stock(self):
         """Calculate current stock from incoming - outgoing - invoices (sales)"""
-        # Sum all incoming stock
+        # Sum all incoming stock for this business
         incoming = self.stock_movements.filter(movement_type='IN').aggregate(
             total=models.Sum('quantity')
         )['total'] or Decimal('0')
         
-        # Sum all outgoing stock
+        # Sum all outgoing stock for this business
         outgoing = self.stock_movements.filter(movement_type='OUT').aggregate(
             total=models.Sum('quantity')
         )['total'] or Decimal('0')
         
-        # Sum all invoice quantities (sales) through InvoiceItem
+        # Sum all invoice quantities (sales) through InvoiceItem for this business
         from .models import InvoiceItem
-        invoiced = InvoiceItem.objects.filter(product=self).aggregate(
+        invoiced = InvoiceItem.objects.filter(
+            product=self,
+            invoice__business=self.business
+        ).aggregate(
             total=models.Sum('quantity')
         )['total'] or Decimal('0')
         
@@ -84,6 +132,7 @@ class StockMovement(models.Model):
         ('OUT', 'Outgoing Stock'),
     ]
     
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='stock_movements')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_movements')
     movement_type = models.CharField(max_length=3, choices=MOVEMENT_TYPES)
     quantity = models.DecimalField(
@@ -100,6 +149,9 @@ class StockMovement(models.Model):
     
     class Meta:
         ordering = ['-movement_date', '-created_at']
+        indexes = [
+            models.Index(fields=['business', 'product']),
+        ]
     
     def __str__(self):
         return f"{self.get_movement_type_display()} - {self.product.item_name} ({self.quantity})"
@@ -107,13 +159,14 @@ class StockMovement(models.Model):
 
 class Invoice(models.Model):
     """Invoice model - header information"""
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='invoices')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     
     # Client information
     client_name = models.CharField(max_length=200)
     
     # Invoice details
-    invoice_number = models.CharField(max_length=50, unique=True, blank=True)
+    invoice_number = models.CharField(max_length=50, blank=True)
     invoice_date = models.DateField(default=date.today)
     
     # Timestamps
@@ -122,6 +175,10 @@ class Invoice(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        unique_together = [['business', 'invoice_number']]
+        indexes = [
+            models.Index(fields=['business', 'user']),
+        ]
     
     @property
     def subtotal(self):
@@ -130,8 +187,8 @@ class Invoice(models.Model):
     
     @property
     def tax_amount(self):
-        """Calculate 10% tax on subtotal"""
-        return self.subtotal * Decimal('0.1')
+        """Calculate 0% tax on subtotal"""
+        return self.subtotal * Decimal('0.0')
     
     @property
     def total(self):
@@ -146,8 +203,9 @@ class Invoice(models.Model):
                 # Generate invoice number: INV-YYYYMMDD-XXXX
                 today = date.today()
                 date_str = today.strftime('%Y%m%d')
-                # Get the count of invoices created today with a lock
+                # Get the count of invoices created today for this business with a lock
                 today_count = Invoice.objects.filter(
+                    business=self.business,
                     invoice_number__startswith=f'INV-{date_str}'
                 ).select_for_update().count()
                 self.invoice_number = f'INV-{date_str}-{today_count + 1:04d}'
@@ -170,6 +228,9 @@ class InvoiceItem(models.Model):
     
     class Meta:
         ordering = ['id']
+        indexes = [
+            models.Index(fields=['invoice', 'product']),
+        ]
     
     @property
     def line_total(self):

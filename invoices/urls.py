@@ -5,6 +5,12 @@ app_name = 'invoices'
 
 urlpatterns = [
     path('', views.home, name='home'),
+    
+    # Business selection URLs
+    path('business/select/', views.business_selection, name='business_selection'),
+    path('business/select/<int:business_id>/', views.select_business, name='select_business'),
+    path('business/switch/', views.switch_business, name='switch_business'),
+    
     path('invoices/', views.invoice_list, name='invoice_list'),
     path('invoices/admin/', views.admin_invoice_list, name='admin_invoice_list'),
     path('invoices/create/', views.create_invoice, name='create_invoice'),

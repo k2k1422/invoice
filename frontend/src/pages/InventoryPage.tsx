@@ -94,7 +94,7 @@ const InventoryPage: React.FC = () => {
         {user?.is_staff && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenDialog(true)}>Add Stock Movement</Button>}
       </Box>
 
-      {!user?.is_staff && <Alert severity="info" sx={{ mb: 2 }}>View Only - Contact admin to add stock movements</Alert>}
+      {!user?.is_staff && <Alert severity="info" sx={{ mb: 2 }}>View Only - Contact Business Admin to add stock movements</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
       <Box display="flex" gap={2} mb={3}>

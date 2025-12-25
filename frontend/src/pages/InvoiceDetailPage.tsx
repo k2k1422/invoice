@@ -114,7 +114,7 @@ const InvoiceDetailPage: React.FC = () => {
             <Typography>₹{Number(invoice.subtotal).toFixed(2)}</Typography>
           </Box>
           <Box display="flex" justifyContent="space-between" width={300}>
-            <Typography>Tax (10%):</Typography>
+            <Typography>Tax (0%):</Typography>
             <Typography>₹{Number(invoice.tax_amount).toFixed(2)}</Typography>
           </Box>
           <Divider sx={{ width: 300 }} />

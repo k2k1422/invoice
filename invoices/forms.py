@@ -13,6 +13,7 @@ class InvoiceForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        business = kwargs.pop('business', None)
         super().__init__(*args, **kwargs)
         # Make all fields required
         for field_name, field in self.fields.items():
@@ -31,9 +32,16 @@ class InvoiceItemForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        business = kwargs.pop('business', None)
         super().__init__(*args, **kwargs)
-        # Only show active products
-        self.fields['product'].queryset = Product.objects.filter(is_active=True)
+        # Only show active products in current business
+        if business:
+            self.fields['product'].queryset = Product.objects.filter(
+                business=business,
+                is_active=True
+            )
+        else:
+            self.fields['product'].queryset = Product.objects.filter(is_active=True)
         # Make all fields required
         for field_name, field in self.fields.items():
             field.required = True
@@ -76,9 +84,16 @@ class StockMovementForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        business = kwargs.pop('business', None)
         super().__init__(*args, **kwargs)
-        # Only show active products
-        self.fields['product'].queryset = Product.objects.filter(is_active=True)
+        # Only show active products in current business
+        if business:
+            self.fields['product'].queryset = Product.objects.filter(
+                business=business,
+                is_active=True
+            )
+        else:
+            self.fields['product'].queryset = Product.objects.filter(is_active=True)
         # Make fields required except notes
         for field_name, field in self.fields.items():
             if field_name != 'notes':

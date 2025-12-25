@@ -90,7 +90,7 @@ const ProductsPage: React.FC = () => {
         <Typography variant="h4">Products</Typography>
         {user?.is_staff && <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>Add Product</Button>}
       </Box>
-      {!user?.is_staff && <Alert severity="info" sx={{ mb: 2 }}>View Only - Contact admin to add or edit products</Alert>}
+      {!user?.is_staff && <Alert severity="info" sx={{ mb: 2 }}>View Only - Contact Business Admin to add or edit products</Alert>}
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
       <TableContainer component={Paper}>
         <Table>

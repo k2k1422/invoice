@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 // Pages
 import LoginPage from './pages/LoginPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
+import BusinessSelection from './pages/BusinessSelection';
 import DashboardPage from './pages/DashboardPage';
 import ProductsPage from './pages/ProductsPage';
 import InventoryPage from './pages/InventoryPage';
@@ -13,6 +14,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import CreateInvoicePage from './pages/CreateInvoicePage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import UsersPage from './pages/UsersPage';
+import BusinessManagementPage from './pages/BusinessManagementPage';
 
 // Components
 import Layout from './components/Layout';
@@ -58,11 +60,41 @@ function AppRoutes() {
         }
       />
 
+      {/* Business Selection Route */}
+      <Route
+        path="/business/select"
+        element={
+          <PrivateRoute>
+            <BusinessSelection />
+          </PrivateRoute>
+        }
+      />
+
+      {/* Business Management Route - No business required for superusers */}
+      <Route
+        path="/businesses"
+        element={
+          <PrivateRoute requirePasswordChange={true}>
+            <BusinessManagementPage />
+          </PrivateRoute>
+        }
+      />
+
+      {/* User Management Route - No business required for staff */}
+      <Route
+        path="/users"
+        element={
+          <PrivateRoute requirePasswordChange={true}>
+            <UsersPage />
+          </PrivateRoute>
+        }
+      />
+
       {/* Protected Routes */}
       <Route
         path="/"
         element={
-          <PrivateRoute requirePasswordChange={true}>
+          <PrivateRoute requirePasswordChange={true} requireBusiness={true}>
             <Layout />
           </PrivateRoute>
         }
@@ -73,7 +105,6 @@ function AppRoutes() {
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="invoices/create" element={<CreateInvoicePage />} />
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />
-        <Route path="users" element={<UsersPage />} />
       </Route>
 
       {/* Fallback */}

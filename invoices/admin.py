@@ -1,5 +1,22 @@
 from django.contrib import admin
-from .models import Product, Invoice, InvoiceItem, UserProfile, StockMovement
+from .models import Product, Invoice, InvoiceItem, UserProfile, StockMovement, Business, BusinessMembership
+
+
+@admin.register(Business)
+class BusinessAdmin(admin.ModelAdmin):
+    """Admin interface for Business management"""
+    list_display = ['name', 'description', 'created_at']
+    search_fields = ['name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(BusinessMembership)
+class BusinessMembershipAdmin(admin.ModelAdmin):
+    """Admin interface for BusinessMembership management"""
+    list_display = ['user', 'business', 'role', 'created_at']
+    list_filter = ['role', 'business']
+    search_fields = ['user__username', 'business__name']
+    readonly_fields = ['created_at']
 
 
 @admin.register(UserProfile)
@@ -13,9 +30,9 @@ class UserProfileAdmin(admin.ModelAdmin):
 @admin.register(StockMovement)
 class StockMovementAdmin(admin.ModelAdmin):
     """Admin interface for StockMovement management"""
-    list_display = ['movement_date', 'product', 'movement_type', 'quantity', 'created_by', 'created_at']
-    list_filter = ['movement_type', 'movement_date', 'created_at']
-    search_fields = ['product__item_name', 'notes']
+    list_display = ['movement_date', 'business', 'product', 'movement_type', 'quantity', 'created_by', 'created_at']
+    list_filter = ['movement_type', 'business', 'movement_date', 'created_at']
+    search_fields = ['product__item_name', 'notes', 'business__name']
     readonly_fields = ['created_at']
     date_hierarchy = 'movement_date'
 
@@ -23,14 +40,14 @@ class StockMovementAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     """Admin interface for Product/Inventory management - Only staff can access"""
-    list_display = ['item_name', 'unit_of_measure', 'unit_price', 'quantity_in_stock', 'is_active', 'updated_at']
-    list_filter = ['is_active', 'unit_of_measure', 'created_at']
-    search_fields = ['item_name', 'description']
+    list_display = ['item_name', 'business', 'unit_of_measure', 'unit_price', 'quantity_in_stock', 'is_active', 'updated_at']
+    list_filter = ['is_active', 'business', 'unit_of_measure', 'created_at']
+    search_fields = ['item_name', 'description', 'business__name']
     readonly_fields = ['created_at', 'updated_at']
     
     fieldsets = (
         ('Product Information', {
-            'fields': ('item_name', 'description', 'unit_of_measure')
+            'fields': ('business', 'item_name', 'description', 'unit_of_measure')
         }),
         ('Pricing & Stock', {
             'fields': ('unit_price', 'quantity_in_stock', 'is_active')
@@ -77,9 +94,9 @@ class InvoiceItemInline(admin.TabularInline):
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
     """Admin interface for Invoice management"""
-    list_display = ['invoice_number', 'client_name', 'user', 'invoice_date', 'total', 'created_at']
-    list_filter = ['invoice_date', 'created_at']
-    search_fields = ['invoice_number', 'client_name']
+    list_display = ['invoice_number', 'business', 'client_name', 'user', 'invoice_date', 'total', 'created_at']
+    list_filter = ['business', 'invoice_date', 'created_at']
+    search_fields = ['invoice_number', 'client_name', 'business__name']
     readonly_fields = ['invoice_number', 'subtotal', 'tax_amount', 'total', 'created_at', 'updated_at']
     inlines = [InvoiceItemInline]
     

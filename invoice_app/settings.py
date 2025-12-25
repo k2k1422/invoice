@@ -55,6 +55,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'invoices.middleware.BusinessContextMiddleware',  # Business context injection
+    'invoices.middleware.PasswordChangeMiddleware',   # Password change enforcement
 ]
 
 ROOT_URLCONF = 'invoice_app.urls'
@@ -135,7 +137,7 @@ STATICFILES_DIRS = [
 
 # Authentication URLs
 LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/business/select/'  # Redirect to business selection after login
 LOGOUT_REDIRECT_URL = '/'
 
 # Default primary key field type
@@ -146,8 +148,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # For browsable API
+        'invoices.authentication.JWTAuthenticationWithBusinessContext',
+        'invoices.authentication.SessionAuthenticationWithBusinessContext',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',

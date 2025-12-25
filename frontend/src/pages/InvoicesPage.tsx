@@ -129,7 +129,7 @@ const InvoicesPage: React.FC = () => {
         </>
       )}
 
-      {!user?.is_staff && <Alert severity="info" sx={{ mb: 2 }}>Showing your invoices only</Alert>}
+      {!user?.is_staff && <Alert severity="info" sx={{ mb: 2 }}>Showing your invoices only. Contact Business Admin for full access.</Alert>}
 
       <TableContainer component={Paper}>
         <Table>

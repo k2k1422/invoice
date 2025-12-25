@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Select Business{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 40px auto; padding: 0 20px;">
+    <h2>Select a Business</h2>
+    <p>Choose a business to continue. You have access to the following businesses:</p>
+    
+    {% if businesses %}
+    <div style="margin-top: 30px;">
+        {% for business in businesses %}
+        <div style="border: 1px solid #ddd; padding: 20px; margin-bottom: 15px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s;"
+             onclick="window.location.href='{% url 'invoices:select_business' business.id %}';"
+             onmouseover="this.style.backgroundColor='#f5f5f5';"
+             onmouseout="this.style.backgroundColor='white';">
+            <h3 style="margin: 0 0 10px 0;">{{ business.name }}</h3>
+            {% if business.description %}
+            <p style="margin: 0; color: #666;">{{ business.description }}</p>
+            {% endif %}
+            <div style="margin-top: 10px;">
+                <a href="{% url 'invoices:select_business' business.id %}" 
+                   style="background: black; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                    Select Business
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="margin-top: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+        <p style="margin: 0;">You do not have access to any businesses. Please contact an administrator to grant you access.</p>
+    </div>
+    {% endif %}
+    
+    <!-- User Management Link for all users -->
+    {% if user.is_staff %}
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+        <h3>Administration</h3>
+        <p>Manage users and business access from the user management page.</p>
+        <a href="{% url 'invoices:user_management' %}" 
+           style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">
+            User Management
+        </a>
+    </div>
+    {% endif %}
+    
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+        <a href="{% url 'invoices:logout' %}" style="color: #666; text-decoration: none;">← Logout</a>
+    </div>
+</div>
+{% endblock %}

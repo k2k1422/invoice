@@ -7,8 +7,9 @@ from django.contrib import messages
 from django.http import HttpResponse
 from datetime import datetime, timedelta
 from django.utils import timezone
-from .models import Invoice, Product, StockMovement
+from .models import Invoice, Product, StockMovement, Business, BusinessMembership
 from .forms import InvoiceForm, ProductForm, StockMovementForm
+from .middleware import BUSINESS_ID_SESSION_KEY
 
 def home(request):
     """Home page view"""
@@ -20,6 +21,58 @@ def home(request):
     
     return render(request, 'invoices/home.html')
 
+
+@login_required
+def business_selection(request):
+    """View for selecting a business after login"""
+    # Get all businesses the user has access to
+    businesses = Business.objects.filter(memberships__user=request.user).order_by('name')
+    
+    # If user has no businesses, show error
+    if not businesses.exists():
+        messages.error(request, 'You do not have access to any businesses. Please contact an administrator.')
+        return render(request, 'invoices/business_selection.html', {'businesses': []})
+    
+    # If user has only one business, auto-select it
+    if businesses.count() == 1:
+        business = businesses.first()
+        request.session[BUSINESS_ID_SESSION_KEY] = business.id
+        messages.success(request, f'Switched to business: {business.name}')
+        return redirect('invoices:home')
+    
+    return render(request, 'invoices/business_selection.html', {'businesses': businesses})
+
+
+@login_required
+def select_business(request, business_id):
+    """Select a business and store in session"""
+    # Verify the user has access to this business
+    try:
+        business = Business.objects.get(id=business_id)
+        if not business.memberships.filter(user=request.user).exists():
+            messages.error(request, 'You do not have access to this business.')
+            return redirect('invoices:business_selection')
+        
+        # Store business ID in session
+        request.session[BUSINESS_ID_SESSION_KEY] = business.id
+        messages.success(request, f'Switched to business: {business.name}')
+        return redirect('invoices:home')
+    
+    except Business.DoesNotExist:
+        messages.error(request, 'Business not found.')
+        return redirect('invoices:business_selection')
+
+
+@login_required
+def switch_business(request):
+    """Switch to a different business"""
+    # Clear current business from session
+    if BUSINESS_ID_SESSION_KEY in request.session:
+        del request.session[BUSINESS_ID_SESSION_KEY]
+    
+    return redirect('invoices:business_selection')
+
+
 @login_required
 def invoice_list(request):
     """List all invoices for the current user"""
@@ -27,42 +80,46 @@ def invoice_list(request):
     if request.user.is_staff:
         return redirect('invoices:admin_invoice_list')
     
-    invoices = Invoice.objects.filter(user=request.user).order_by('-created_at')
+    invoices = Invoice.objects.filter(
+        business=request.business,
+        user=request.user
+    ).order_by('-created_at')
     return render(request, 'invoices/invoice_list.html', {'invoices': invoices})
 
 @login_required
 def create_invoice(request):
     """Create a new invoice"""
     if request.method == 'POST':
-        form = InvoiceForm(request.POST)
+        form = InvoiceForm(request.POST, business=request.business)
         if form.is_valid():
             invoice = form.save(commit=False)
             invoice.user = request.user
+            invoice.business = request.business
             invoice.save()
             messages.success(request, 'Invoice created successfully!')
             return redirect('invoices:invoice_detail', invoice_id=invoice.id)
     else:
-        form = InvoiceForm()
+        form = InvoiceForm(business=request.business)
     return render(request, 'invoices/create_invoice.html', {'form': form})
 
 @login_required
 def invoice_detail(request, invoice_id):
     """Display invoice details"""
-    # Admin can view all invoices, regular users only their own
+    # Admin can view all invoices in business, regular users only their own
     if request.user.is_staff:
-        invoice = get_object_or_404(Invoice, id=invoice_id)
+        invoice = get_object_or_404(Invoice, id=invoice_id, business=request.business)
     else:
-        invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
+        invoice = get_object_or_404(Invoice, id=invoice_id, business=request.business, user=request.user)
     return render(request, 'invoices/invoice_detail.html', {'invoice': invoice})
 
 @login_required
 def invoice_print(request, invoice_id):
     """Print-friendly view of invoice"""
-    # Admin can view all invoices, regular users only their own
+    # Admin can view all invoices in business, regular users only their own
     if request.user.is_staff:
-        invoice = get_object_or_404(Invoice, id=invoice_id)
+        invoice = get_object_or_404(Invoice, id=invoice_id, business=request.business)
     else:
-        invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
+        invoice = get_object_or_404(Invoice, id=invoice_id, business=request.business, user=request.user)
     return render(request, 'invoices/invoice_print.html', {'invoice': invoice})
 
 def custom_logout_view(request):
@@ -116,8 +173,8 @@ def admin_invoice_list(request):
     user_id = request.GET.get('user', 'all')
     date_range = request.GET.get('date_range', '30')  # Default to 30 days
     
-    # Start with all invoices
-    invoices = Invoice.objects.all()
+    # Start with all invoices in current business
+    invoices = Invoice.objects.filter(business=request.business)
     
     # Apply user filter
     if user_id != 'all':
@@ -136,10 +193,12 @@ def admin_invoice_list(request):
             pass
     
     # Order by most recent
-    invoices = invoices.select_related('user', 'product').order_by('-created_at')
+    invoices = invoices.select_related('user').order_by('-created_at')
     
-    # Get all users for the filter dropdown
-    users = User.objects.filter(invoice__isnull=False).distinct().order_by('username')
+    # Get all users who have invoices in this business for the filter dropdown
+    users = User.objects.filter(
+        invoice__business=request.business
+    ).distinct().order_by('username')
     
     # Calculate stats
     total_count = invoices.count()
@@ -160,7 +219,7 @@ def admin_invoice_list(request):
 @login_required
 def product_list(request):
     """List all products - All users can view"""
-    products = Product.objects.all().order_by('item_name')
+    products = Product.objects.filter(business=request.business).order_by('item_name')
     active_count = products.filter(is_active=True).count()
     total_count = products.count()
     
@@ -177,7 +236,9 @@ def create_product(request):
     if request.method == 'POST':
         form = ProductForm(request.POST)
         if form.is_valid():
-            product = form.save()
+            product = form.save(commit=False)
+            product.business = request.business
+            product.save()
             messages.success(request, f'Product "{product.item_name}" created successfully!')
             return redirect('invoices:product_list')
     else:
@@ -188,7 +249,7 @@ def create_product(request):
 @user_passes_test(is_staff_user, login_url='/admin/login/')
 def edit_product(request, product_id):
     """Edit an existing product - Staff only"""
-    product = get_object_or_404(Product, id=product_id)
+    product = get_object_or_404(Product, id=product_id, business=request.business)
     
     if request.method == 'POST':
         form = ProductForm(request.POST, instance=product)
@@ -205,7 +266,7 @@ def edit_product(request, product_id):
 @user_passes_test(is_staff_user, login_url='/admin/login/')
 def delete_product(request, product_id):
     """Delete a product - Staff only"""
-    product = get_object_or_404(Product, id=product_id)
+    product = get_object_or_404(Product, id=product_id, business=request.business)
     
     if request.method == 'POST':
         product_name = product.item_name
@@ -356,11 +417,13 @@ def toggle_user_status(request, user_id):
 @login_required
 def inventory_management(request):
     """View all stock movements and current inventory - All users can view"""
-    # Get all products with their stock levels
-    products = Product.objects.all().order_by('item_name')
+    # Get all products with their stock levels for current business
+    products = Product.objects.filter(business=request.business).order_by('item_name')
     
-    # Get recent stock movements
-    recent_movements = StockMovement.objects.select_related('product', 'created_by').all()[:50]
+    # Get recent stock movements for current business
+    recent_movements = StockMovement.objects.filter(
+        business=request.business
+    ).select_related('product', 'created_by')[:50]
     
     # Calculate totals
     total_products = products.count()
@@ -380,9 +443,10 @@ def inventory_management(request):
 def add_stock_movement(request):
     """Add incoming or outgoing stock - Admin only"""
     if request.method == 'POST':
-        form = StockMovementForm(request.POST)
+        form = StockMovementForm(request.POST, business=request.business)
         if form.is_valid():
             movement = form.save(commit=False)
+            movement.business = request.business
             movement.created_by = request.user
             movement.save()
             
@@ -390,7 +454,7 @@ def add_stock_movement(request):
             messages.success(request, f'{movement_type} of {movement.quantity} {movement.product.unit_of_measure} recorded for {movement.product.item_name}!')
             return redirect('invoices:inventory_management')
     else:
-        form = StockMovementForm()
+        form = StockMovementForm(business=request.business)
     
     return render(request, 'invoices/add_stock_movement.html', {'form': form})
 
@@ -398,7 +462,7 @@ def add_stock_movement(request):
 @login_required
 def product_stock_history(request, product_id):
     """View stock movement history for a specific product - All users can view"""
-    product = get_object_or_404(Product, id=product_id)
+    product = get_object_or_404(Product, id=product_id, business=request.business)
     movements = product.stock_movements.select_related('created_by').all()
     
     # Calculate running totals

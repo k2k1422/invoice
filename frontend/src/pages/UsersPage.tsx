@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, CircularProgress, IconButton, Tooltip } from '@mui/material';
+import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert, CircularProgress, IconButton, Tooltip, AppBar, Toolbar, Menu, MenuItem, Container } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: number;
@@ -15,6 +17,7 @@ interface User {
   first_name: string;
   last_name: string;
   is_staff: boolean;
+  is_superuser: boolean;
   is_active: boolean;
   must_change_password: boolean;
   date_joined: string;
@@ -28,7 +31,8 @@ interface UserStats {
 }
 
 const UsersPage: React.FC = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats>({ total_users: 0, active_users: 0, staff_users: 0, users_need_password_change: 0 });
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,7 @@ const UsersPage: React.FC = () => {
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [formData, setFormData] = useState({ username: '', email: '', first_name: '', last_name: '', is_staff: false });
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   useEffect(() => { fetchUsers(); fetchStats(); }, []);
 
@@ -111,18 +116,63 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  if (!currentUser?.is_staff) return <Alert severity="error">Access Denied - Staff Only</Alert>;
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+    handleMenuClose();
+  };
+
+  const handleChangePassword = () => {
+    navigate('/change-password');
+    handleMenuClose();
+  };
+
+  if (!currentUser?.is_staff) return <Alert severity="error">Access Denied - Business Admin Only</Alert>;
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px"><CircularProgress /></Box>;
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">User Management</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenDialog(true)}>Create User</Button>
-      </Box>
+    <>
+      <AppBar position="fixed">
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Invoice Management System
+          </Typography>
+          <IconButton color="inherit" onClick={handleMenuOpen}>
+            <AccountCircleIcon />
+            <Typography variant="body2" sx={{ ml: 1 }}>
+              {currentUser?.username}
+            </Typography>
+          </IconButton>
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+          >
+            <MenuItem onClick={() => { navigate('/business/select'); handleMenuClose(); }}>
+              Business Selection
+            </MenuItem>
+            <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
+            <MenuItem onClick={handleLogout}>Logout</MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+      <Container maxWidth="lg">
+        <Box sx={{ mt: 10, mb: 4 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Typography variant="h4">User Management</Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenDialog(true)}>Create User</Button>
+          </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+          {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       <Box display="flex" gap={2} mb={3}>
         <Paper sx={{ p: 2, flex: 1 }}><Typography variant="h6">{stats.total_users}</Typography><Typography variant="body2" color="text.secondary">Total Users</Typography></Paper>
@@ -138,7 +188,7 @@ const UsersPage: React.FC = () => {
               <TableCell><strong>Username</strong></TableCell>
               <TableCell><strong>Name</strong></TableCell>
               <TableCell><strong>Email</strong></TableCell>
-              <TableCell align="center"><strong>Staff</strong></TableCell>
+              <TableCell align="center"><strong>User Type</strong></TableCell>
               <TableCell align="center"><strong>Status</strong></TableCell>
               <TableCell align="center"><strong>Password Change</strong></TableCell>
               <TableCell><strong>Joined</strong></TableCell>
@@ -153,7 +203,15 @@ const UsersPage: React.FC = () => {
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.first_name} {user.last_name}</TableCell>
                   <TableCell>{user.email}</TableCell>
-                  <TableCell align="center">{user.is_staff ? <Chip label="Staff" color="primary" size="small" /> : <Chip label="User" size="small" />}</TableCell>
+                  <TableCell align="center">
+                    {user.is_superuser ? (
+                      <Chip label="Superuser" color="error" size="small" />
+                    ) : user.is_staff ? (
+                      <Chip label="Business Admin" color="primary" size="small" />
+                    ) : (
+                      <Chip label="Staff" size="small" />
+                    )}
+                  </TableCell>
                   <TableCell align="center">{user.is_active ? <Chip label="Active" color="success" size="small" /> : <Chip label="Inactive" color="default" size="small" />}</TableCell>
                   <TableCell align="center">{user.must_change_password && <Chip label="Required" color="warning" size="small" />}</TableCell>
                   <TableCell>{new Date(user.date_joined).toLocaleDateString()}</TableCell>
@@ -184,8 +242,8 @@ const UsersPage: React.FC = () => {
           <TextField fullWidth label="First Name" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} margin="normal" />
           <TextField fullWidth label="Last Name" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} margin="normal" />
           <TextField fullWidth select label="Role" value={formData.is_staff ? 'staff' : 'user'} onChange={(e) => setFormData({ ...formData, is_staff: e.target.value === 'staff' })} margin="normal" SelectProps={{ native: true }}>
-            <option value="user">Regular User</option>
-            <option value="staff">Staff User</option>
+            <option value="user">Staff</option>
+            <option value="staff">Business Admin</option>
           </TextField>
         </DialogContent>
         <DialogActions>
@@ -204,7 +262,9 @@ const UsersPage: React.FC = () => {
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">Delete</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+        </Box>
+      </Container>
+    </>
   );
 };
 

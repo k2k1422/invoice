@@ -22,12 +22,13 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 from invoices.viewsets import (
-    ProductViewSet, StockMovementViewSet, InvoiceViewSet,
+    BusinessViewSet, ProductViewSet, StockMovementViewSet, InvoiceViewSet,
     UserViewSet, AuthViewSet, InventoryViewSet
 )
 
 # DRF Router for API endpoints
 router = DefaultRouter()
+router.register(r'businesses', BusinessViewSet, basename='business')
 router.register(r'products', ProductViewSet, basename='product')
 router.register(r'stock-movements', StockMovementViewSet, basename='stockmovement')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')

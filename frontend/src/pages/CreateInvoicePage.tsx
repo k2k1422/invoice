@@ -51,7 +51,7 @@ const CreateInvoicePage: React.FC = () => {
         subtotal += quantity * unit_price;
       }
     });
-    const tax_amount = subtotal * 0.1;
+    const tax_amount = subtotal * 0.0;
     const total = subtotal + tax_amount;
     setCalculations({ subtotal, tax_amount, total });
   }, [items]);
@@ -250,7 +250,7 @@ const CreateInvoicePage: React.FC = () => {
           </Box>
 
           <Box display="flex" justifyContent="space-between" mb={1}>
-            <Typography color="text.secondary">Tax (10%):</Typography>
+            <Typography color="text.secondary">Tax (0%):</Typography>
             <Typography>₹{Number(calculations.tax_amount).toFixed(2)}</Typography>
           </Box>
 
