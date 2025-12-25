@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Product, Invoice, UserProfile, StockMovement
+from .models import Product, Invoice, InvoiceItem, UserProfile, StockMovement
 
 
 @admin.register(UserProfile)
@@ -62,10 +62,40 @@ class ProductAdmin(admin.ModelAdmin):
         return request.user.is_staff
 
 
+class InvoiceItemInline(admin.TabularInline):
+    """Inline admin for invoice items"""
+    model = InvoiceItem
+    extra = 1
+    fields = ['product', 'quantity', 'unit_price', 'line_total']
+    readonly_fields = ['line_total']
+    
+    def line_total(self, obj):
+        return f"₹{obj.line_total:.2f}" if obj.id else "-"
+    line_total.short_description = 'Line Total'
+
+
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
     """Admin interface for Invoice management"""
-    list_display = ['invoice_number', 'client_name', 'user', 'invoice_date', 'created_at']
+    list_display = ['invoice_number', 'client_name', 'user', 'invoice_date', 'total', 'created_at']
     list_filter = ['invoice_date', 'created_at']
     search_fields = ['invoice_number', 'client_name']
-    readonly_fields = ['invoice_number', 'created_at', 'updated_at']
+    readonly_fields = ['invoice_number', 'subtotal', 'tax_amount', 'total', 'created_at', 'updated_at']
+    inlines = [InvoiceItemInline]
+    
+    fieldsets = (
+        ('Invoice Information', {
+            'fields': ('invoice_number', 'client_name', 'user', 'invoice_date')
+        }),
+        ('Totals', {
+            'fields': ('subtotal', 'tax_amount', 'total')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def total(self, obj):
+        return f"₹{obj.total:.2f}"
+    total.short_description = 'Total'

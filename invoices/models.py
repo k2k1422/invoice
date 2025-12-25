@@ -4,6 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal
 from datetime import date
+from django.db import transaction
 
 
 class UserProfile(models.Model):
@@ -64,9 +65,9 @@ class Product(models.Model):
             total=models.Sum('quantity')
         )['total'] or Decimal('0')
         
-        # Sum all invoice quantities (sales)
-        from .models import Invoice
-        invoiced = Invoice.objects.filter(product=self).aggregate(
+        # Sum all invoice quantities (sales) through InvoiceItem
+        from .models import InvoiceItem
+        invoiced = InvoiceItem.objects.filter(product=self).aggregate(
             total=models.Sum('quantity')
         )['total'] or Decimal('0')
         
@@ -105,7 +106,7 @@ class StockMovement(models.Model):
 
 
 class Invoice(models.Model):
-    """Invoice model"""
+    """Invoice model - header information"""
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     
     # Client information
@@ -115,28 +116,6 @@ class Invoice(models.Model):
     invoice_number = models.CharField(max_length=50, unique=True, blank=True)
     invoice_date = models.DateField(default=date.today)
     
-    # Product and quantity
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, null=True, blank=True)
-    quantity = models.PositiveIntegerField(default=1)
-    
-    # Calculated fields
-    @property
-    def unit_price(self):
-        """Get unit price from product"""
-        return self.product.unit_price if self.product else Decimal('0')
-    
-    @property
-    def subtotal(self):
-        return self.quantity * self.unit_price
-    
-    @property
-    def tax_amount(self):
-        return self.subtotal * Decimal('0.1')  # 10% tax
-    
-    @property
-    def total(self):
-        return self.subtotal + self.tax_amount
-    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -144,19 +123,64 @@ class Invoice(models.Model):
     class Meta:
         ordering = ['-created_at']
     
+    @property
+    def subtotal(self):
+        """Calculate subtotal from all line items"""
+        return sum(item.line_total for item in self.items.all())
+    
+    @property
+    def tax_amount(self):
+        """Calculate 10% tax on subtotal"""
+        return self.subtotal * Decimal('0.1')
+    
+    @property
+    def total(self):
+        """Calculate total including tax"""
+        return self.subtotal + self.tax_amount
+    
     def save(self, *args, **kwargs):
         """Auto-generate invoice number if not provided"""
         if not self.invoice_number:
-            # Generate invoice number: INV-YYYYMMDD-XXXX
-            today = date.today()
-            date_str = today.strftime('%Y%m%d')
-            # Get the count of invoices created today
-            today_count = Invoice.objects.filter(
-                invoice_number__startswith=f'INV-{date_str}'
-            ).count()
-            self.invoice_number = f'INV-{date_str}-{today_count + 1:04d}'
+            # Use transaction with select_for_update to prevent race conditions
+            with transaction.atomic():
+                # Generate invoice number: INV-YYYYMMDD-XXXX
+                today = date.today()
+                date_str = today.strftime('%Y%m%d')
+                # Get the count of invoices created today with a lock
+                today_count = Invoice.objects.filter(
+                    invoice_number__startswith=f'INV-{date_str}'
+                ).select_for_update().count()
+                self.invoice_number = f'INV-{date_str}-{today_count + 1:04d}'
         
         super().save(*args, **kwargs)
     
     def __str__(self):
         return f"Invoice {self.invoice_number} - {self.client_name}"
+
+
+class InvoiceItem(models.Model):
+    """Invoice line items - products in an invoice"""
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['id']
+    
+    @property
+    def line_total(self):
+        """Calculate line total"""
+        return self.quantity * self.unit_price
+    
+    def save(self, *args, **kwargs):
+        """Auto-set unit_price from product if not provided"""
+        if not self.unit_price:
+            self.unit_price = self.product.unit_price
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.invoice.invoice_number} - {self.product.item_name} x {self.quantity}"

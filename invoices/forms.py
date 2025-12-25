@@ -1,16 +1,33 @@
 from django import forms
-from .models import Invoice, Product, StockMovement
+from .models import Invoice, InvoiceItem, Product, StockMovement
 
 class InvoiceForm(forms.ModelForm):
     """Form for creating and editing invoices"""
     
     class Meta:
         model = Invoice
-        fields = ['client_name', 'product', 'quantity']
+        fields = ['client_name', 'invoice_date']
         widgets = {
             'client_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'invoice_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make all fields required
+        for field_name, field in self.fields.items():
+            field.required = True
+
+
+class InvoiceItemForm(forms.ModelForm):
+    """Form for invoice line items"""
+    
+    class Meta:
+        model = InvoiceItem
+        fields = ['product', 'quantity']
+        widgets = {
             'product': forms.Select(attrs={'class': 'form-control'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
         }
     
     def __init__(self, *args, **kwargs):
