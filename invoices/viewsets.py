@@ -8,12 +8,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from .models import Product, StockMovement, Invoice, InvoiceItem, UserProfile, Business, BusinessMembership
+from .models import Product, StockMovement, Invoice, InvoiceItem, UserProfile, Business, BusinessMembership, Deposit
 from .serializers import (
     ProductSerializer, StockMovementSerializer, InvoiceSerializer,
     UserSerializer, UserCreateSerializer, PasswordChangeSerializer,
     ProductStockHistorySerializer, BusinessSerializer, BusinessCreateSerializer,
-    AddMemberSerializer, BusinessListSerializer
+    AddMemberSerializer, BusinessListSerializer, DepositSerializer
 )
 from .permissions import IsStaffUser, IsOwnerOrStaff, CannotModifySelf, IsSuperUser, HasBusinessAccess
 from .middleware import BUSINESS_ID_SESSION_KEY
@@ -642,4 +642,85 @@ class InventoryViewSet(viewsets.ViewSet):
                 'total_products': len(inventory_data),
                 'low_stock_count': low_stock_count
             }
+        })
+
+
+class DepositViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Deposit operations.
+    Regular users see only their deposits.
+    Staff users see all deposits with filters.
+    """
+    serializer_class = DepositSerializer
+    permission_classes = [IsAuthenticated, HasBusinessAccess]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['deposit_date']
+    ordering_fields = ['deposit_date', 'created_at', 'amount']
+    
+    def get_queryset(self):
+        """
+        Regular users see only their deposits.
+        Staff users see all deposits with optional filters.
+        """
+        user = self.request.user
+        
+        # Filter by business first
+        if hasattr(self.request, 'business') and self.request.business:
+            queryset = Deposit.objects.filter(
+                business=self.request.business
+            ).select_related('user').order_by('-deposit_date', '-created_at')
+        else:
+            queryset = Deposit.objects.none()
+        
+        if not user.is_staff:
+            # Regular users only see their own deposits
+            queryset = queryset.filter(user=user)
+        else:
+            # Staff can filter by user
+            user_id = self.request.query_params.get('user_id', None)
+            if user_id and user_id != 'all':
+                queryset = queryset.filter(user_id=user_id)
+            
+            # Date range filter
+            date_range = self.request.query_params.get('date_range', None)
+            from_date = self.request.query_params.get('from_date', None)
+            to_date = self.request.query_params.get('to_date', None)
+            
+            # Custom date range takes precedence
+            if from_date:
+                queryset = queryset.filter(deposit_date__gte=from_date)
+            if to_date:
+                queryset = queryset.filter(deposit_date__lte=to_date)
+            # Fallback to preset date range
+            elif date_range and date_range != 'all' and not from_date and not to_date:
+                try:
+                    days = int(date_range)
+                    start_date = datetime.now().date() - timedelta(days=days)
+                    queryset = queryset.filter(deposit_date__gte=start_date)
+                except ValueError:
+                    pass
+        
+        return queryset
+    
+    def get_permissions(self):
+        """Check ownership for retrieve, update, delete"""
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsOwnerOrStaff(), HasBusinessAccess()]
+        return [IsAuthenticated(), HasBusinessAccess()]
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsStaffUser])
+    def stats(self, request):
+        """Get deposit statistics for admin"""
+        queryset = self.get_queryset()
+        
+        total_count = queryset.count()
+        total_amount = sum(deposit.amount for deposit in queryset)
+        
+        # Get unique users who made deposits
+        users_with_deposits = queryset.values('user__id', 'user__username').distinct()
+        
+        return Response({
+            'total_count': total_count,
+            'total_amount': float(total_amount),
+            'users': list(users_with_deposits)
         })

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile, Product, StockMovement, Invoice, InvoiceItem, Business, BusinessMembership
+from .models import UserProfile, Product, StockMovement, Invoice, InvoiceItem, Business, BusinessMembership, Deposit
 from decimal import Decimal
 
 
@@ -302,3 +302,26 @@ class AddMemberSerializer(serializers.Serializer):
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found.")
         return value
+
+
+class DepositSerializer(serializers.ModelSerializer):
+    """Serializer for Deposit model"""
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    user_full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Deposit
+        fields = ['id', 'user', 'user_username', 'user_full_name', 'amount', 
+                  'deposit_date', 'description', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'user_username', 'user_full_name', 
+                           'created_at', 'updated_at']
+    
+    def get_user_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+    
+    def create(self, validated_data):
+        """Create deposit with user and business from request"""
+        validated_data['user'] = self.context['request'].user
+        if hasattr(self.context['request'], 'business'):
+            validated_data['business'] = self.context['request'].business
+        return Deposit.objects.create(**validated_data)

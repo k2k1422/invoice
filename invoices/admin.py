@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Product, Invoice, InvoiceItem, UserProfile, StockMovement, Business, BusinessMembership
+from .models import Product, Invoice, InvoiceItem, UserProfile, StockMovement, Business, BusinessMembership, Deposit
 
 
 @admin.register(Business)
@@ -116,3 +116,23 @@ class InvoiceAdmin(admin.ModelAdmin):
     def total(self, obj):
         return f"₹{obj.total:.2f}"
     total.short_description = 'Total'
+
+
+@admin.register(Deposit)
+class DepositAdmin(admin.ModelAdmin):
+    """Admin interface for Deposit management"""
+    list_display = ['user', 'business', 'amount', 'deposit_date', 'created_at']
+    list_filter = ['business', 'deposit_date', 'created_at']
+    search_fields = ['user__username', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'deposit_date'
+    
+    fieldsets = (
+        ('Deposit Information', {
+            'fields': ('business', 'user', 'amount', 'deposit_date', 'description')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

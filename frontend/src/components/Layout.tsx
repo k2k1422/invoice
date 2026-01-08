@@ -22,6 +22,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import PeopleIcon from '@mui/icons-material/People';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -66,6 +67,7 @@ const Layout: React.FC = () => {
     { text: 'Products', icon: <InventoryIcon />, path: '/products', show: true },
     { text: 'Inventory', icon: <InventoryIcon />, path: '/inventory', show: true },
     { text: 'Invoices', icon: <ReceiptIcon />, path: '/invoices', show: true },
+    { text: 'Deposits', icon: <AccountBalanceWalletIcon />, path: '/deposits', show: true },
   ];
 
   const handleSwitchBusiness = () => {

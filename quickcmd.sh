@@ -7,7 +7,10 @@ sudo apt update -y
 sudo apt install git -ysudo apt update
 
 
+python manage.py makemigrations
+python manage.py migrate
 python manage.py collectstatic
+
 
 
 

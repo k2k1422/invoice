@@ -23,7 +23,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 from invoices.viewsets import (
     BusinessViewSet, ProductViewSet, StockMovementViewSet, InvoiceViewSet,
-    UserViewSet, AuthViewSet, InventoryViewSet
+    UserViewSet, AuthViewSet, InventoryViewSet, DepositViewSet
 )
 
 # DRF Router for API endpoints
@@ -32,6 +32,7 @@ router.register(r'businesses', BusinessViewSet, basename='business')
 router.register(r'products', ProductViewSet, basename='product')
 router.register(r'stock-movements', StockMovementViewSet, basename='stockmovement')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
+router.register(r'deposits', DepositViewSet, basename='deposit')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'auth', AuthViewSet, basename='auth')
 router.register(r'inventory', InventoryViewSet, basename='inventory')
