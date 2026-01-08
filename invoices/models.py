@@ -174,6 +174,7 @@ class Invoice(models.Model):
     invoice_number = models.CharField(max_length=50, blank=True)
     invoice_date = models.DateField(default=date.today)
     payment_type = models.CharField(max_length=10, choices=PAYMENT_TYPE_CHOICES, default='cash')
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -198,8 +199,8 @@ class Invoice(models.Model):
     
     @property
     def total(self):
-        """Calculate total including tax"""
-        return self.subtotal + self.tax_amount
+        """Calculate total including tax and discount"""
+        return self.subtotal + self.tax_amount - self.discount
     
     def save(self, *args, **kwargs):
         """Auto-generate invoice number if not provided"""

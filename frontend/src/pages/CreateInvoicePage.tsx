@@ -29,7 +29,8 @@ const CreateInvoicePage: React.FC = () => {
   const [formData, setFormData] = useState({
     client_name: '',
     invoice_date: new Date().toISOString().split('T')[0],
-    payment_type: 'cash'
+    payment_type: 'cash',
+    discount: ''
   });
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: '1', product: '', quantity: '', unit_price: 0, unit_of_measure: '', product_name: '' }
@@ -37,6 +38,7 @@ const CreateInvoicePage: React.FC = () => {
   const [calculations, setCalculations] = useState({
     subtotal: 0,
     tax_amount: 0,
+    discount: 0,
     total: 0
   });
 
@@ -53,9 +55,10 @@ const CreateInvoicePage: React.FC = () => {
       }
     });
     const tax_amount = subtotal * 0.0;
-    const total = subtotal + tax_amount;
-    setCalculations({ subtotal, tax_amount, total });
-  }, [items]);
+    const discount = parseFloat(formData.discount) || 0;
+    const total = subtotal + tax_amount - discount;
+    setCalculations({ subtotal, tax_amount, discount, total });
+  }, [items, formData.discount]);
 
   const fetchProducts = async () => {
     try {
@@ -119,6 +122,13 @@ const CreateInvoicePage: React.FC = () => {
       return;
     }
 
+    // Validate discount is not greater than subtotal
+    const discountAmount = parseFloat(formData.discount) || 0;
+    if (discountAmount > calculations.subtotal) {
+      setError(`Discount cannot be greater than subtotal (₹${calculations.subtotal.toFixed(2)})`);
+      return;
+    }
+
     try {
       setLoading(true);
       // Create single invoice with multiple items
@@ -126,6 +136,7 @@ const CreateInvoicePage: React.FC = () => {
         client_name: formData.client_name,
         invoice_date: formData.invoice_date,
         payment_type: formData.payment_type,
+        discount: formData.discount || 0,
         items: items.map(item => ({
           product: item.product,
           quantity: item.quantity,
@@ -277,6 +288,24 @@ const CreateInvoicePage: React.FC = () => {
           <Box display="flex" justifyContent="space-between" mb={1}>
             <Typography color="text.secondary">Tax (0%):</Typography>
             <Typography>₹{Number(calculations.tax_amount).toFixed(2)}</Typography>
+          </Box>
+
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+            <TextField
+              label="Discount"
+              type="number"
+              value={formData.discount}
+              onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+              size="small"
+              sx={{ width: '200px' }}
+              inputProps={{ min: 0, step: 0.01, max: calculations.subtotal }}
+              error={parseFloat(formData.discount || '0') > calculations.subtotal}
+              helperText={parseFloat(formData.discount || '0') > calculations.subtotal ? 'Exceeds subtotal' : ''}
+              InputProps={{
+                startAdornment: <Typography sx={{ mr: 1 }}>₹</Typography>
+              }}
+            />
+            <Typography color="error">- ₹{Number(calculations.discount).toFixed(2)}</Typography>
           </Box>
 
           <Divider sx={{ my: 2 }} />

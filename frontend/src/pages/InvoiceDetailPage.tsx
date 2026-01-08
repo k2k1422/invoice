@@ -23,6 +23,7 @@ interface InvoiceDetail {
   items: InvoiceItem[];
   subtotal: number;
   tax_amount: number;
+  discount: number;
   total: number;
   invoice_date: string;
   user_username: string;
@@ -156,6 +157,12 @@ const InvoiceDetailPage: React.FC = () => {
             <Typography>Tax (0%):</Typography>
             <Typography>₹{Number(invoice.tax_amount).toFixed(2)}</Typography>
           </Box>
+          {invoice.discount > 0 && (
+            <Box display="flex" justifyContent="space-between" width={300}>
+              <Typography color="text.secondary">Discount:</Typography>
+              <Typography color="error">- ₹{Number(invoice.discount).toFixed(2)}</Typography>
+            </Box>
+          )}
           <Divider sx={{ width: 300 }} />
           <Box display="flex" justifyContent="space-between" width={300}>
             <Typography variant="h6" fontWeight="bold">Total:</Typography>
