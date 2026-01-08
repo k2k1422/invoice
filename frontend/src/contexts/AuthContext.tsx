@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 interface User {
@@ -38,6 +39,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Logout callback for axios interceptor
+let logoutCallback: (() => void) | null = null;
+let isRefreshing = false;
+
 // Configure axios defaults
 axios.defaults.baseURL = '/api';
 axios.defaults.headers.common['Content-Type'] = 'application/json';
@@ -64,26 +69,43 @@ axios.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // Already refreshing, just reject to avoid loop
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = localStorage.getItem('refresh_token');
+      
+      if (!refreshToken) {
+        // No refresh token, trigger logout
+        isRefreshing = false;
+        if (logoutCallback) {
+          logoutCallback();
+        }
+        return Promise.reject(error);
+      }
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post('/token/refresh/', {
-            refresh: refreshToken,
-          });
+        const response = await axios.post('/token/refresh/', {
+          refresh: refreshToken,
+        });
 
-          const { access } = response.data;
-          localStorage.setItem('access_token', access);
-
-          originalRequest.headers.Authorization = `Bearer ${access}`;
-          return axios(originalRequest);
-        }
+        const { access } = response.data;
+        localStorage.setItem('access_token', access);
+        originalRequest.headers.Authorization = `Bearer ${access}`;
+        isRefreshing = false;
+        
+        return axios(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, clear tokens and redirect to login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+        // Refresh failed, trigger logout via callback
+        isRefreshing = false;
+        if (logoutCallback) {
+          logoutCallback();
+        }
+        return Promise.reject(refreshError);
       }
     }
 
@@ -92,10 +114,30 @@ axios.interceptors.response.use(
 );
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
+
+  // Logout function
+  const logout = useCallback(() => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
+    setCurrentBusiness(null);
+    setBusinesses([]);
+    setIsLoading(false);
+    navigate('/login', { replace: true });
+  }, [navigate]);
+
+  // Register logout callback for interceptor
+  useEffect(() => {
+    logoutCallback = logout;
+    return () => {
+      logoutCallback = null;
+    };
+  }, [logout]);
 
   const fetchUser = async () => {
     const token = localStorage.getItem('access_token');
@@ -109,8 +151,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.data);
     } catch (error) {
       console.error('Failed to fetch user:', error);
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      // Interceptor will handle logout
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -182,14 +223,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Login failed:', error);
       throw error;
     }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setUser(null);
-    setCurrentBusiness(null);
-    setBusinesses([]);
   };
 
   const selectBusiness = async (businessId: number) => {
