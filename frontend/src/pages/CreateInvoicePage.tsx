@@ -97,6 +97,12 @@ const CreateInvoicePage: React.FC = () => {
             product_name: product ? product.item_name : ''
           };
         }
+        // For quantity field, only allow integers (no decimals)
+        if (field === 'quantity') {
+          // Remove any decimal points and non-numeric characters except empty string
+          const integerValue = value === '' ? '' : value.replace(/[^0-9]/g, '');
+          return { ...item, [field]: integerValue };
+        }
         return { ...item, [field]: value };
       }
       return item;
@@ -107,9 +113,9 @@ const CreateInvoicePage: React.FC = () => {
     e.preventDefault();
     
     // Validate that all items have product and quantity
-    const invalidItems = items.filter(item => !item.product || !item.quantity);
+    const invalidItems = items.filter(item => !item.product || !item.quantity || parseInt(item.quantity) <= 0);
     if (invalidItems.length > 0) {
-      setError('Please fill in all product and quantity fields');
+      setError('Please fill in all product and quantity fields with valid whole numbers');
       return;
     }
 
@@ -224,11 +230,15 @@ const CreateInvoicePage: React.FC = () => {
                         <TextField
                           fullWidth
                           size="small"
-                          type="number"
+                          type="text"
                           value={item.quantity}
                           onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)}
-                          inputProps={{ min: 0.01, step: 0.01 }}
+                          inputProps={{ 
+                            inputMode: 'numeric',
+                            pattern: '[0-9]*'
+                          }}
                           helperText={item.unit_of_measure}
+                          placeholder="Enter whole number"
                           required
                         />
                       </TableCell>
