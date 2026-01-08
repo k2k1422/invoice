@@ -11,12 +11,29 @@ class IsStaffUser(permissions.BasePermission):
 
 class IsOwnerOrStaff(permissions.BasePermission):
     """
-    Permission to only allow owners of an object or staff to access it.
+    Permission to only allow owners of an object, staff, or business admins to access it.
     """
     def has_object_permission(self, request, view, obj):
+        # Superusers have full access
+        if request.user.is_superuser:
+            return True
+        
         # Staff users have full access
         if request.user.is_staff:
             return True
+        
+        # Business admins have full access to their business objects
+        if hasattr(obj, 'business') and hasattr(request, 'business'):
+            if obj.business == request.business:
+                # Check if user is admin of this business
+                from .models import BusinessMembership
+                is_admin = BusinessMembership.objects.filter(
+                    business=obj.business,
+                    user=request.user,
+                    role='admin'
+                ).exists()
+                if is_admin:
+                    return True
         
         # Check if object has a user field (for invoices)
         if hasattr(obj, 'user'):

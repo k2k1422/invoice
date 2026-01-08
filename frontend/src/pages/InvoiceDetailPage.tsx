@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, Button, CircularProgress, Alert, Divider, Table, TableHead, TableBody, TableRow, TableCell } from '@mui/material';
+import { Box, Typography, Paper, Button, CircularProgress, Alert, Divider, Table, TableHead, TableBody, TableRow, TableCell, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 interface InvoiceItem {
   id: number;
@@ -30,9 +32,12 @@ interface InvoiceDetail {
 const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => { fetchInvoice(); }, [id]);
 
@@ -53,6 +58,21 @@ const InvoiceDetailPage: React.FC = () => {
     window.print();
   };
 
+  const handleDelete = async () => {
+    try {
+      setDeleting(true);
+      await axios.delete(`/invoices/${id}/`);
+      navigate('/invoices');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete invoice');
+      setDeleteDialogOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const canDelete = user?.is_staff || user?.is_superuser;
+
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px"><CircularProgress /></Box>;
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!invoice) return <Alert severity="warning">Invoice not found</Alert>;
@@ -61,7 +81,19 @@ const InvoiceDetailPage: React.FC = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} className="no-print">
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/invoices')}>Back to Invoices</Button>
-        <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>Print Invoice</Button>
+        <Box>
+          {canDelete && (
+            <Button 
+              color="error" 
+              startIcon={<DeleteIcon />} 
+              onClick={() => setDeleteDialogOpen(true)}
+              sx={{ mr: 2 }}
+            >
+              Delete
+            </Button>
+          )}
+          <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint}>Print Invoice</Button>
+        </Box>
       </Box>
 
       <Paper sx={{ p: 4, maxWidth: 800, margin: '0 auto' }} className="print-section">
@@ -137,6 +169,21 @@ const InvoiceDetailPage: React.FC = () => {
           </Typography>
         </Box>
       </Paper>
+
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Invoice?</DialogTitle>
+        <DialogContent>
+          Are you sure you want to delete invoice {invoice?.invoice_number}? This action cannot be undone.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDelete} color="error" disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <style>{`
         @media print {
