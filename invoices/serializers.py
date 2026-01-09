@@ -16,12 +16,13 @@ class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True)
     full_name = serializers.SerializerMethodField()
     must_change_password = serializers.SerializerMethodField()
+    current_business_role = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 
                   'full_name', 'is_staff', 'is_active', 'is_superuser', 'date_joined', 
-                  'profile', 'must_change_password']
+                  'profile', 'must_change_password', 'current_business_role']
         read_only_fields = ['id', 'date_joined']
     
     def get_full_name(self, obj):
@@ -32,6 +33,18 @@ class UserSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'profile'):
             return obj.profile.must_change_password
         return False
+    
+    def get_current_business_role(self, obj):
+        """Get user's role in the current business from request context"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'business') and request.business:
+            membership = BusinessMembership.objects.filter(
+                user=obj,
+                business=request.business
+            ).first()
+            if membership:
+                return membership.role
+        return None
 
 
 class ProductSerializer(serializers.ModelSerializer):

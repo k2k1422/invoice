@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, MenuItem, TextField, CircularProgress, Alert, Chip } from '@mui/material';
+import { Box, Typography, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, MenuItem, TextField, CircularProgress, Alert, Chip, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -27,7 +28,11 @@ const DepositsPage: React.FC = () => {
   const [stats, setStats] = useState<DepositStats>({ total_count: 0, total_amount: 0, users: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [filters, setFilters] = useState({ user_id: 'all', date_range: '30', from_date: '', to_date: '' });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => { 
     fetchDeposits(); 
@@ -70,6 +75,40 @@ const DepositsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteClick = (deposit: Deposit) => {
+    setDepositToDelete(deposit);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!depositToDelete) return;
+    
+    setDeleting(true);
+    try {
+      await axios.delete(`/deposits/${depositToDelete.id}/`);
+      setSuccess(`Deposit of ₹${depositToDelete.amount} deleted successfully`);
+      setDeleteDialogOpen(false);
+      setDepositToDelete(null);
+      fetchDeposits();
+      if (user?.is_staff) fetchStats();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to delete deposit');
+      setDeleteDialogOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setDepositToDelete(null);
+  };
+
+  const canDeleteDeposit = (): boolean => {
+    // Only superusers, staff, or business admins can delete
+    return user?.is_superuser || user?.is_staff || user?.current_business_role === 'admin';
+  };
+
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px"><CircularProgress /></Box>;
 
   return (
@@ -82,6 +121,7 @@ const DepositsPage: React.FC = () => {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       {user?.is_staff && (
         <Paper sx={{ p: 2, mb: 3 }}>
@@ -151,12 +191,13 @@ const DepositsPage: React.FC = () => {
               {user?.is_staff && <TableCell><strong>User</strong></TableCell>}
               <TableCell align="right"><strong>Amount</strong></TableCell>
               <TableCell><strong>Description</strong></TableCell>
+              <TableCell align="center"><strong>Actions</strong></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {deposits.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={user?.is_staff ? 4 : 3} align="center">
+                <TableCell colSpan={user?.is_staff ? 5 : 4} align="center">
                   <Typography color="text.secondary">No deposits found</Typography>
                 </TableCell>
               </TableRow>
@@ -175,12 +216,67 @@ const DepositsPage: React.FC = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>{deposit.description || '-'}</TableCell>
+                  <TableCell align="center">
+                    {canDeleteDeposit() && (
+                      <IconButton
+                        color="error"
+                        size="small"
+                        onClick={() => handleDeleteClick(deposit)}
+                        title="Delete deposit"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-dialog-title"
+      >
+        <DialogTitle id="delete-dialog-title">Confirm Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this deposit?
+          </DialogContentText>
+          {depositToDelete && (
+            <Box mt={2} p={2} bgcolor="grey.100" borderRadius={1}>
+              <Typography variant="body2"><strong>Date:</strong> {new Date(depositToDelete.deposit_date).toLocaleDateString()}</Typography>
+              <Typography variant="body2"><strong>Amount:</strong> ₹{Number(depositToDelete.amount).toFixed(2)}</Typography>
+              {depositToDelete.description && (
+                <Typography variant="body2"><strong>Description:</strong> {depositToDelete.description}</Typography>
+              )}
+              {user?.is_staff && (
+                <Typography variant="body2"><strong>User:</strong> {depositToDelete.user_full_name || depositToDelete.user_username}</Typography>
+              )}
+            </Box>
+          )}
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            This action cannot be undone.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+            disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={20} /> : <DeleteIcon />}
+          >
+            {deleting ? 'Deleting...' : 'Delete Deposit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

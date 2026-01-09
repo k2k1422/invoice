@@ -15,7 +15,9 @@ from .serializers import (
     ProductStockHistorySerializer, BusinessSerializer, BusinessCreateSerializer,
     AddMemberSerializer, BusinessListSerializer, DepositSerializer
 )
-from .permissions import IsStaffUser, IsOwnerOrStaff, CannotModifySelf, IsSuperUser, HasBusinessAccess
+from .permissions import (
+    IsStaffUser, IsOwnerOrStaff, CannotModifySelf, IsSuperUser, HasBusinessAccess, IsSuperuserOrBusinessAdmin
+)
 from .middleware import BUSINESS_ID_SESSION_KEY
 
 
@@ -573,7 +575,7 @@ class AuthViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def me(self, request):
         """Get current user info"""
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={'request': request})
         return Response(serializer.data)
     
     @action(detail=False, methods=['post'])
@@ -703,8 +705,10 @@ class DepositViewSet(viewsets.ModelViewSet):
         return queryset
     
     def get_permissions(self):
-        """Check ownership for retrieve, update, delete"""
-        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+        """Check permissions - only superusers and business admins can delete"""
+        if self.action == 'destroy':
+            return [IsAuthenticated(), IsSuperuserOrBusinessAdmin(), HasBusinessAccess()]
+        if self.action in ['retrieve', 'update', 'partial_update']:
             return [IsAuthenticated(), IsOwnerOrStaff(), HasBusinessAccess()]
         return [IsAuthenticated(), HasBusinessAccess()]
     

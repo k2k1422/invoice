@@ -89,3 +89,34 @@ class HasBusinessAccess(permissions.BasePermission):
             return obj.business == request.business
         
         return True
+
+
+class IsSuperuserOrBusinessAdmin(permissions.BasePermission):
+    """
+    Permission to only allow superusers and business admins to access.
+    Regular users (members) are not allowed, even for their own objects.
+    """
+    def has_object_permission(self, request, view, obj):
+        # Superusers have full access
+        if request.user.is_superuser:
+            return True
+        
+        # Staff users have full access
+        if request.user.is_staff:
+            return True
+        
+        # Business admins have full access to their business objects
+        if hasattr(obj, 'business') and hasattr(request, 'business'):
+            if obj.business == request.business:
+                # Check if user is admin of this business
+                from .models import BusinessMembership
+                is_admin = BusinessMembership.objects.filter(
+                    business=obj.business,
+                    user=request.user,
+                    role='admin'
+                ).exists()
+                if is_admin:
+                    return True
+        
+        # Regular users cannot perform this action
+        return False

@@ -12,6 +12,7 @@ interface User {
   is_staff: boolean;
   is_active: boolean;
   is_superuser: boolean;
+  current_business_role: 'admin' | 'member' | null;
   profile: {
     must_change_password: boolean;
   };
