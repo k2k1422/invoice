@@ -3,10 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.models import User
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Count, F, DecimalField
 from django_filters.rest_framework import DjangoFilterBackend
 from datetime import datetime, timedelta
 from decimal import Decimal
+from collections import defaultdict
 
 from .models import Product, StockMovement, Invoice, InvoiceItem, UserProfile, Business, BusinessMembership, Deposit
 from .serializers import (
@@ -742,3 +743,125 @@ class DepositViewSet(viewsets.ModelViewSet):
         ).values('user__id', 'user__username').order_by('user__username')
         
         return Response(list(users_with_deposits))
+
+
+class AuditViewSet(viewsets.ViewSet):
+    """
+    ViewSet for audit data - comparing deposits with invoices.
+    Only accessible to staff users and business admins.
+    """
+    permission_classes = [IsAuthenticated, IsStaffUser]
+    
+    @action(detail=False, methods=['get'])
+    def comparison(self, request):
+        """Get deposit vs invoice comparison data for charts"""
+        # Get filter parameters
+        date_range = request.query_params.get('date_range', '30')
+        from_date = request.query_params.get('from_date')
+        to_date = request.query_params.get('to_date')
+        payment_type = request.query_params.get('payment_type', 'cash')  # cash, online, total
+        user_id = request.query_params.get('user')  # Optional user filter
+        
+        # Determine date range
+        if from_date and to_date:
+            start_date = datetime.strptime(from_date, '%Y-%m-%d').date()
+            end_date = datetime.strptime(to_date, '%Y-%m-%d').date()
+        elif date_range != 'all':
+            try:
+                days = int(date_range)
+                end_date = datetime.now().date()
+                start_date = end_date - timedelta(days=days)
+            except ValueError:
+                end_date = datetime.now().date()
+                start_date = end_date - timedelta(days=30)
+        else:
+            # All time - get earliest date
+            if hasattr(request, 'business') and request.business:
+                earliest_deposit = Deposit.objects.filter(business=request.business).order_by('deposit_date').first()
+                earliest_invoice = Invoice.objects.filter(business=request.business).order_by('invoice_date').first()
+                
+                if earliest_deposit and earliest_invoice:
+                    start_date = min(earliest_deposit.deposit_date, earliest_invoice.invoice_date)
+                elif earliest_deposit:
+                    start_date = earliest_deposit.deposit_date
+                elif earliest_invoice:
+                    start_date = earliest_invoice.invoice_date
+                else:
+                    start_date = datetime.now().date() - timedelta(days=30)
+                
+                end_date = datetime.now().date()
+            else:
+                end_date = datetime.now().date()
+                start_date = end_date - timedelta(days=30)
+        
+        # Get deposits grouped by date
+        if hasattr(request, 'business') and request.business:
+            deposit_filter = Q(
+                business=request.business,
+                deposit_date__gte=start_date,
+                deposit_date__lte=end_date
+            )
+            if user_id and user_id.isdigit():
+                deposit_filter &= Q(user_id=int(user_id))
+            
+            deposits = Deposit.objects.filter(deposit_filter).values('deposit_date').annotate(
+                total=Sum('amount')
+            ).order_by('deposit_date')
+            
+            # Get invoices grouped by date with payment type filter
+            invoice_filter = Q(
+                business=request.business,
+                invoice_date__gte=start_date,
+                invoice_date__lte=end_date
+            )
+            
+            if user_id and user_id.isdigit():
+                invoice_filter &= Q(user_id=int(user_id))
+            
+            if payment_type == 'cash':
+                invoice_filter &= Q(payment_type='cash')
+            elif payment_type == 'online':
+                invoice_filter &= Q(payment_type='online')
+            # If 'total', don't filter by payment_type
+            
+            invoices = Invoice.objects.filter(invoice_filter).values('invoice_date').annotate(
+                total=Sum(F('items__quantity') * F('items__unit_price'), output_field=DecimalField())
+            ).order_by('invoice_date')
+        else:
+            deposits = []
+            invoices = []
+        
+        # Convert to dict for easy lookup
+        deposit_by_date = {d['deposit_date'].strftime('%Y-%m-%d'): float(d['total']) for d in deposits}
+        invoice_by_date = {i['invoice_date'].strftime('%Y-%m-%d'): float(i['total']) if i['total'] else 0 for i in invoices}
+        
+        # Generate all dates in range
+        date_labels = []
+        deposit_data = []
+        invoice_data = []
+        
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime('%Y-%m-%d')
+            date_labels.append(date_str)
+            deposit_data.append(deposit_by_date.get(date_str, 0))
+            invoice_data.append(invoice_by_date.get(date_str, 0))
+            current_date += timedelta(days=1)
+        
+        # Calculate summary stats
+        total_deposits = sum(deposit_data)
+        total_invoices = sum(invoice_data)
+        difference = total_deposits - total_invoices
+        
+        return Response({
+            'labels': date_labels,
+            'deposits': deposit_data,
+            'invoices': invoice_data,
+            'summary': {
+                'total_deposits': total_deposits,
+                'total_invoices': total_invoices,
+                'difference': difference,
+                'deposit_count': len([d for d in deposit_data if d > 0]),
+                'invoice_count': len([i for i in invoice_data if i > 0])
+            }
+        })

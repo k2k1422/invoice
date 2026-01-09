@@ -15,6 +15,7 @@ import CreateInvoicePage from './pages/CreateInvoicePage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import DepositsPage from './pages/DepositsPage';
 import CreateDepositPage from './pages/CreateDepositPage';
+import AuditPage from './pages/AuditPage';
 import UsersPage from './pages/UsersPage';
 import BusinessManagementPage from './pages/BusinessManagementPage';
 
@@ -109,6 +110,7 @@ function AppRoutes() {
         <Route path="invoices/:id" element={<InvoiceDetailPage />} />
         <Route path="deposits" element={<DepositsPage />} />
         <Route path="deposits/create" element={<CreateDepositPage />} />
+        <Route path="audit" element={<AuditPage />} />
       </Route>
 
       {/* Fallback */}

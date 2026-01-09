@@ -23,7 +23,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 from invoices.viewsets import (
     BusinessViewSet, ProductViewSet, StockMovementViewSet, InvoiceViewSet,
-    UserViewSet, AuthViewSet, InventoryViewSet, DepositViewSet
+    UserViewSet, AuthViewSet, InventoryViewSet, DepositViewSet, AuditViewSet
 )
 
 # DRF Router for API endpoints
@@ -36,6 +36,7 @@ router.register(r'deposits', DepositViewSet, basename='deposit')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'auth', AuthViewSet, basename='auth')
 router.register(r'inventory', InventoryViewSet, basename='inventory')
+router.register(r'audit', AuditViewSet, basename='audit')
 
 urlpatterns = [
     # Django Admin
