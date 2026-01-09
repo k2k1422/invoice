@@ -26,6 +26,7 @@ const DepositsPage: React.FC = () => {
   const navigate = useNavigate();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [stats, setStats] = useState<DepositStats>({ total_count: 0, total_amount: 0, users: [] });
+  const [users, setUsers] = useState<Array<{ user__id: number; user__username: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -36,7 +37,10 @@ const DepositsPage: React.FC = () => {
 
   useEffect(() => { 
     fetchDeposits(); 
-    if (user?.is_staff) fetchStats(); 
+    if (user?.is_staff) {
+      fetchStats();
+      fetchUsers();
+    }
   }, [filters]);
 
   const fetchDeposits = async () => {
@@ -72,6 +76,15 @@ const DepositsPage: React.FC = () => {
       setStats(response.data);
     } catch (err) {
       console.error('Failed to fetch deposit stats:', err);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get('/deposits/users/');
+      setUsers(response.data);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
     }
   };
 
@@ -136,7 +149,7 @@ const DepositsPage: React.FC = () => {
               size="small"
             >
               <MenuItem value="all">All Users</MenuItem>
-              {stats.users.map((u) => (
+              {users.map((u) => (
                 <MenuItem key={u.user__id} value={u.user__id}>
                   {u.user__username}
                 </MenuItem>

@@ -720,11 +720,25 @@ class DepositViewSet(viewsets.ModelViewSet):
         total_count = queryset.count()
         total_amount = sum(deposit.amount for deposit in queryset)
         
-        # Get unique users who made deposits
-        users_with_deposits = queryset.values('user__id', 'user__username').distinct()
-        
         return Response({
             'total_count': total_count,
-            'total_amount': float(total_amount),
-            'users': list(users_with_deposits)
+            'total_amount': float(total_amount)
         })
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsStaffUser])
+    def users(self, request):
+        """Get all unique users who have made deposits - independent of filters"""
+        from django.db.models import Count
+        
+        # Get all deposits for the current business without applying user filters
+        if hasattr(request, 'business') and request.business:
+            base_queryset = Deposit.objects.filter(business=request.business)
+        else:
+            base_queryset = Deposit.objects.none()
+        
+        # Get unique users
+        users_with_deposits = base_queryset.values('user__id', 'user__username').annotate(
+            count=Count('user__id')
+        ).values('user__id', 'user__username').order_by('user__username')
+        
+        return Response(list(users_with_deposits))
