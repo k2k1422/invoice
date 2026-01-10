@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, MenuItem, TextField, CircularProgress, Alert, Grid, Card, CardContent } from '@mui/material';
+import { Box, Typography, Paper, MenuItem, TextField, CircularProgress, Alert, Grid, Card, CardContent, Checkbox, FormControlLabel } from '@mui/material';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -50,6 +50,7 @@ const AuditPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [users, setUsers] = useState<User[]>([]);
+  const [cumulativeView, setCumulativeView] = useState(true);
   const [filters, setFilters] = useState({
     date_range: '30',
     from_date: '',
@@ -97,6 +98,17 @@ const AuditPage: React.FC = () => {
     }
   };
 
+  // Calculate cumulative data
+  const getCumulativeData = (dataArray: number[]) => {
+    const cumulative: number[] = [];
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i];
+      cumulative.push(sum);
+    }
+    return cumulative;
+  };
+
   if (!user?.is_staff) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -113,20 +125,23 @@ const AuditPage: React.FC = () => {
     );
   }
 
+  const depositsData = data ? (cumulativeView ? getCumulativeData(data.deposits) : data.deposits) : [];
+  const invoicesData = data ? (cumulativeView ? getCumulativeData(data.invoices) : data.invoices) : [];
+
   const chartData = data ? {
     labels: data.labels,
     datasets: [
       {
-        label: 'Deposits',
-        data: data.deposits,
+        label: `Deposits${cumulativeView ? ' (Cumulative)' : ''}`,
+        data: depositsData,
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.2)',
         tension: 0.1,
         fill: true
       },
       {
-        label: `Invoices (${filters.payment_type === 'total' ? 'All' : filters.payment_type})`,
-        data: data.invoices,
+        label: `Invoices (${filters.payment_type === 'total' ? 'All' : filters.payment_type})${cumulativeView ? ' (Cumulative)' : ''}`,
+        data: invoicesData,
         borderColor: 'rgb(255, 99, 132)',
         backgroundColor: 'rgba(255, 99, 132, 0.2)',
         tension: 0.1,
@@ -144,7 +159,7 @@ const AuditPage: React.FC = () => {
       },
       title: {
         display: true,
-        text: 'Deposits vs Invoices Comparison'
+        text: `Deposits vs Invoices Comparison${cumulativeView ? ' (Cumulative)' : ''}`
       },
       tooltip: {
         callbacks: {
@@ -243,6 +258,17 @@ const AuditPage: React.FC = () => {
             onChange={(e) => setFilters({ ...filters, to_date: e.target.value, date_range: '' })}
             InputLabelProps={{ shrink: true }}
             size="small"
+          />
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={cumulativeView}
+                onChange={(e) => setCumulativeView(e.target.checked)}
+                color="primary"
+              />
+            }
+            label="Cumulative View"
           />
         </Box>
       </Paper>
